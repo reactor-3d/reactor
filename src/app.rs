@@ -1,5 +1,4 @@
 use eframe::{App, CreationContext};
-use egui::ahash::HashSet;
 use egui::{Id, Key, LayerId, Order, Sense, UiBuilder};
 use egui_dock::{AllowedSplits, DockArea, DockState, SurfaceIndex, TabViewer};
 use serde::{Deserialize, Serialize};
@@ -82,23 +81,48 @@ impl Default for AppSettings {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub enum Tab {
-    Viewport,
-    Settings,
+    Viewport(String),
+    Settings(String),
 }
 
 impl Tab {
-    pub fn title(self) -> &'static str {
+    pub fn new_viwport() -> Self {
+        Self::Viewport("Viewport".into())
+    }
+
+    pub fn new_settings() -> Self {
+        Self::Settings("Settings".into())
+    }
+
+    pub fn name(&self) -> &'static str {
         match self {
-            Self::Viewport => "Viewport",
-            Self::Settings => "Settings",
+            Self::Viewport(_) => "Viewport",
+            Self::Settings(_) => "Settings",
+        }
+    }
+
+    pub fn title(&self) -> &str {
+        match self {
+            Self::Viewport(title) | Self::Settings(title) => title.as_str(),
+        }
+    }
+
+    pub fn increment_title(&mut self) {
+        let name = self.name();
+
+        match self {
+            Self::Viewport(title) | Self::Settings(title) => {
+                let mut num = title.trim_start_matches(name).trim().parse::<usize>().unwrap_or(0);
+                num += 1;
+                *title = format!("{name} {num}");
+            },
         }
     }
 }
 
 pub struct AppContext {
-    open_tabs: HashSet<Tab>,
     settings: AppSettings,
 }
 
@@ -111,7 +135,7 @@ impl TabViewer for AppContext {
 
     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
         match tab {
-            Tab::Viewport => {
+            Tab::Viewport(_) => {
                 ui.input(|i| {
                     if i.key_pressed(Key::Tab) {
                         self.settings.edit_mode.switch();
@@ -143,17 +167,12 @@ impl TabViewer for AppContext {
                         overlay_area_ui.interact(last_panel_rect, Id::new("overlay_blocker"), Sense::click_and_drag());
                 }
             },
-            Tab::Settings => {
+            Tab::Settings(_) => {
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     egui_probe::Probe::new(&mut self.settings).show(ui);
                 });
             },
         }
-    }
-
-    fn on_close(&mut self, tab: &mut Self::Tab) -> bool {
-        self.open_tabs.remove(tab);
-        true
     }
 }
 
@@ -184,17 +203,8 @@ impl Reactor3dApp {
             })
             .unwrap_or_else(|| DockState::<Tab>::new(Default::default()));
 
-        let mut open_tabs = HashSet::default();
-        for node in tabs_tree[SurfaceIndex::main()].iter() {
-            if let Some(tabs) = node.tabs() {
-                for tab in tabs {
-                    open_tabs.insert(*tab);
-                }
-            }
-        }
-
         Self {
-            ctx: AppContext { open_tabs, settings },
+            ctx: AppContext { settings },
             tabs_tree,
         }
     }
@@ -212,18 +222,12 @@ impl App for Reactor3dApp {
                 ui.add_space(16.0);
 
                 ui.menu_button("View", |ui| {
-                    // allow certain tabs to be toggled
-                    for tab in [Tab::Viewport, Tab::Settings] {
-                        if ui
-                            .selectable_label(self.ctx.open_tabs.contains(&tab), tab.title())
-                            .clicked()
-                        {
-                            if let Some(index) = self.tabs_tree.find_tab(&tab) {
-                                self.tabs_tree.remove_tab(index);
-                                self.ctx.open_tabs.remove(&tab);
-                            } else {
-                                self.tabs_tree[SurfaceIndex::main()].push_to_focused_leaf(tab);
+                    for mut tab in [Tab::new_viwport(), Tab::new_settings()] {
+                        if ui.button(tab.title()).clicked() {
+                            while self.tabs_tree.find_tab(&tab).is_some() {
+                                tab.increment_title();
                             }
+                            self.tabs_tree[SurfaceIndex::main()].push_to_focused_leaf(tab);
 
                             ui.close_menu();
                         }
