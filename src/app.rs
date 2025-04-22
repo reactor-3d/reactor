@@ -1,12 +1,43 @@
 use eframe::{App, CreationContext};
-use egui::{Id, Key, LayerId, Order, Sense, UiBuilder};
+use egui::{Key, LayerId, Order, Sense, UiBuilder};
 use egui_dock::{DockArea, DockState, SurfaceIndex, TabViewer};
+use egui_snarl::Snarl;
+use egui_snarl::ui::SnarlWidget;
+use serde::{Deserialize, Serialize};
 
+use crate::node::Node;
+use crate::node::viewer::NodeViewer;
 use crate::settings::{AppSettings, EditMode};
 use crate::tabs::Tab;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, Hash)]
+#[repr(u32)]
+pub enum IdKey {
+    Nodes = 0,
+    RenderArea,
+    EditingArea,
+    OverlayArea,
+    OverlayBlocker,
+}
+
 pub struct AppContext {
     settings: AppSettings,
+    snarl: Snarl<Node>,
+    viewer: NodeViewer,
+}
+
+impl AppContext {
+    pub fn open_tab(&mut self, tab: &Tab) {
+        self.settings
+            .edit_modes
+            .insert(tab.title().to_string(), EditMode::default());
+        self.viewer.open_tab(tab, &mut self.snarl);
+    }
+
+    pub fn close_tab(&mut self, tab: &Tab) {
+        self.settings.edit_modes.remove(tab.title());
+        self.viewer.close_tab(tab, &mut self.snarl);
+    }
 }
 
 impl TabViewer for AppContext {
@@ -18,10 +49,10 @@ impl TabViewer for AppContext {
 
     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
         match tab {
-            Tab::Viewport(_) => {
+            Tab::Viewport(tab) => {
                 ui.input(|i| {
-                    if i.key_pressed(Key::Tab) {
-                        self.settings.edit_mode.switch();
+                    if i.modifiers.ctrl && i.key_pressed(Key::Tab) {
+                        self.settings.edit_modes.get_mut(tab.title()).map(|mode| mode.switch());
                     }
                     if i.key_pressed(Key::H) {
                         self.settings.show_nodes = !self.settings.show_nodes;
@@ -33,21 +64,52 @@ impl TabViewer for AppContext {
                 // Render area in the background
                 let render_area_ui = ui.new_child(
                     UiBuilder::new()
-                        .layer_id(LayerId::new(Order::Background, Id::new("render_area")))
+                        .layer_id(LayerId::new(Order::Background, tab.id(IdKey::RenderArea)))
                         .max_rect(last_panel_rect)
                         .sense(Sense::empty()),
                 );
+                self.viewer
+                    .draw(tab, &last_panel_rect, render_area_ui.painter(), &mut self.snarl);
 
-                if let EditMode::View = self.settings.edit_mode {
-                    // Overlay mouse blocker in the foreground
-                    let overlay_area_ui = ui.new_child(
+                if self.settings.show_nodes {
+                    // Editing area with nodes in the middle
+                    let mut editing_area_ui = ui.new_child(
                         UiBuilder::new()
-                            .layer_id(LayerId::new(Order::Foreground, Id::new("overlay_area")))
+                            .layer_id(LayerId::new(Order::Middle, tab.id(IdKey::EditingArea)))
                             .max_rect(last_panel_rect)
                             .sense(Sense::empty()),
                     );
-                    let overlay_response =
-                        overlay_area_ui.interact(last_panel_rect, Id::new("overlay_blocker"), Sense::click_and_drag());
+
+                    editing_area_ui.set_max_size(last_panel_rect.size());
+
+                    let opacity = match self.settings.edit_modes.get(tab.title()) {
+                        Some(EditMode::Editing) => self.settings.editing_nodes_opacity,
+                        Some(EditMode::View) => self.settings.viewing_nodes_opacity,
+                        None => 1.0,
+                    };
+                    editing_area_ui.set_opacity(opacity);
+
+                    SnarlWidget::new()
+                        .id(tab.id(IdKey::Nodes))
+                        .style(self.settings.snarl_style)
+                        .show(&mut self.snarl, &mut self.viewer, &mut editing_area_ui);
+                }
+
+                if let Some(EditMode::View) = self.settings.edit_modes.get(tab.title()) {
+                    // Overlay mouse blocker in the foreground
+                    let render_area_ui = ui.new_child(
+                        UiBuilder::new()
+                            .layer_id(LayerId::new(Order::Foreground, tab.id(IdKey::OverlayArea)))
+                            .max_rect(last_panel_rect)
+                            .sense(Sense::empty()),
+                    );
+                    let overlay_response = render_area_ui.interact(
+                        last_panel_rect,
+                        tab.id(IdKey::OverlayBlocker),
+                        Sense::click_and_drag(),
+                    );
+
+                    self.viewer.after_show(tab, ui, &overlay_response, &mut self.snarl);
                 }
             },
             Tab::Settings(_) => {
@@ -56,6 +118,11 @@ impl TabViewer for AppContext {
                 });
             },
         }
+    }
+
+    fn on_close(&mut self, tab: &mut Self::Tab) -> bool {
+        self.close_tab(tab);
+        true
     }
 }
 
@@ -69,6 +136,13 @@ impl Reactor3dApp {
         egui_extras::install_image_loaders(&cx.egui_ctx);
 
         cx.egui_ctx.style_mut(|style| style.animation_time *= 10.0);
+
+        let mut snarl = cx.storage.map_or_else(Snarl::new, |storage| {
+            storage
+                .get_string("snarl")
+                .and_then(|snarl| serde_json::from_str(&snarl).ok())
+                .unwrap_or_default()
+        });
 
         let settings = cx.storage.map_or_else(AppSettings::default, |storage| {
             storage
@@ -86,8 +160,23 @@ impl Reactor3dApp {
             })
             .unwrap_or_else(|| DockState::<Tab>::new(Default::default()));
 
+        let screen_rect = cx.egui_ctx.input(|i| i.screen_rect());
+        let max_viewport_resolution = (screen_rect.width() * screen_rect.height() / 10.0) as u32;
+        println!("Max resolution: {max_viewport_resolution}");
+
+        let viewer = NodeViewer::new(
+            cx.wgpu_render_state.clone().expect("WGPU must be enabled"),
+            max_viewport_resolution,
+            tabs_tree.iter_all_tabs().map(|((..), tab)| tab),
+            &mut snarl,
+        );
+
         Self {
-            ctx: AppContext { settings },
+            ctx: AppContext {
+                settings,
+                snarl,
+                viewer,
+            },
             tabs_tree,
         }
     }
@@ -110,6 +199,7 @@ impl App for Reactor3dApp {
                             while self.tabs_tree.find_tab(&tab).is_some() {
                                 tab.increment_title();
                             }
+                            self.ctx.open_tab(&tab);
                             self.tabs_tree[SurfaceIndex::main()].push_to_focused_leaf(tab);
 
                             ui.close_menu();
@@ -150,6 +240,9 @@ impl App for Reactor3dApp {
     }
 
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        let snarl = serde_json::to_string(&self.ctx.snarl).unwrap();
+        storage.set_string("snarl", snarl);
+
         let settings = serde_json::to_string(&self.ctx.settings).unwrap();
         storage.set_string("settings", settings);
 

@@ -6,8 +6,10 @@ use eframe::wgpu;
 use self::app::Reactor3dApp;
 
 mod app;
+mod node;
 mod settings;
 mod tabs;
+mod types;
 
 fn main() -> eframe::Result<()> {
     let native_options = eframe::NativeOptions {
