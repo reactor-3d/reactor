@@ -4,8 +4,7 @@ use egui_snarl::ui::PinInfo;
 use egui_snarl::{InPin, NodeId, OutPin, Snarl};
 
 use super::Node;
-use super::output::OutputNode;
-use super::render::RenderNode;
+use super::item::{OutputNode, RenderNode};
 use super::subscribtion::{Event, EventCallback};
 use crate::tabs::Tab;
 
@@ -143,15 +142,15 @@ impl SelfNodeMut<'_> {
     }
 
     pub fn as_render_node_ref(&self) -> &RenderNode {
-        self.node_ref().as_render_node_ref()
+        self.node_ref().as_render_ref()
     }
 
     pub fn as_render_node_mut(&mut self) -> &mut RenderNode {
-        self.node_mut().as_render_node_mut()
+        self.node_mut().as_render_mut()
     }
 
     pub fn as_output_node_mut(&mut self) -> &mut OutputNode {
-        self.node_mut().as_output_node_mut()
+        self.node_mut().as_output_mut()
     }
 }
 

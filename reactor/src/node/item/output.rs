@@ -3,9 +3,9 @@ use egui_snarl::ui::PinInfo;
 use egui_snarl::{InPin, OutPin};
 use serde::{Deserialize, Serialize};
 
-use super::NodeFlags;
-use super::message::{MessageHandling, SelectedTab, SelfNodeMut};
-use super::viewer::empty_input_view;
+use crate::node::message::{MessageHandling, SelectedTab, SelfNodeMut};
+use crate::node::viewer::empty_input_view;
+use crate::node::{NodeFlags, Noded};
 use crate::tabs::Tab;
 
 #[derive(Clone, Default, Serialize, Deserialize)]
@@ -24,14 +24,6 @@ impl OutputNode {
             tab_titles,
             selected_title,
         }
-    }
-
-    pub fn inputs(&self) -> &[u64] {
-        &Self::INPUTS
-    }
-
-    pub fn outputs(&self) -> &[u64] {
-        &Self::OUTPUTS
     }
 
     pub fn selected_title(&self) -> Option<&String> {
@@ -74,9 +66,23 @@ impl OutputNode {
         let SelfNodeMut { id: node_id, snarl } = self_node;
 
         snarl[node_id]
-            .output_node_ref()
+            .output_ref()
             .map(|output_node| output_node.selected_title.as_deref().unwrap_or_default())
             .map(|title| SelectedTab { title, node_id })
+    }
+}
+
+impl Noded for OutputNode {
+    fn name(&self) -> &str {
+        Self::NAME
+    }
+
+    fn inputs(&self) -> &[u64] {
+        &Self::INPUTS
+    }
+
+    fn outputs(&self) -> &[u64] {
+        &Self::OUTPUTS
     }
 }
 

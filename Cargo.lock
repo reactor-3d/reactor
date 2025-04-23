@@ -1093,6 +1093,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "enum_dispatch"
+version = "0.3.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aa18ce2bc66555b3218614519ac839ddb759a7d6720732f979ef8d13be147ecd"
+dependencies = [
+ "once_cell",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "enumflags2"
 version = "0.7.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2797,7 +2809,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3b42e27ef78c35d3998403c1d26f3efd9e135d3e5121b0a4845cc5cc27547f4f"
 
 [[package]]
-name = "reactor-3d"
+name = "reactor"
 version = "0.1.0"
 dependencies = [
  "bitflags 2.9.0",
@@ -2809,9 +2821,21 @@ dependencies = [
  "egui-snarl",
  "egui_dock",
  "egui_extras",
+ "enum_dispatch",
  "nalgebra",
+ "reactor-derives",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "reactor-derives"
+version = "0.1.0"
+dependencies = [
+ "heck",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

@@ -1,0 +1,20 @@
+[package]
+name = "reactor"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bitflags = "2.9"
+bytemuck = { version = "1.22", features = ["derive"] }
+eframe = { version = "0.31", features = ["serde", "persistence", "wgpu"] }
+egui = "0.31"
+egui-probe = { version = "0.8", features = ["derive"] }
+egui-scale = "0.1"
+egui-snarl = { git = "https://github.com/zakarumych/egui-snarl.git", features = ["serde", "egui-probe"] }
+egui_dock = { version = "0.16", features = ["serde"] }
+egui_extras = { version = "0.31", features = ["all_loaders"] }
+enum_dispatch = "0.3"
+nalgebra = { version = "0.33", features = ["serde-serialize", "bytemuck"] }
+reactor-derives = { path = "../derives" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0" }

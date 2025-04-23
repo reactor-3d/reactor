@@ -5,8 +5,9 @@ use egui::{Color32, Ui, WidgetText};
 use egui_snarl::ui::{AnyPins, PinInfo, SnarlViewer};
 use egui_snarl::{InPin, InPinId, NodeId, OutPin, OutPinId, Snarl};
 
-use super::message::{CommonNodeResponse, DisplayMessage, DisplayResponse, InputMessage, InterfaceMessage};
-use super::{Node, RenderNode};
+use super::Noded;
+use crate::node::message::{CommonNodeResponse, DisplayMessage, DisplayResponse, InputMessage, InterfaceMessage};
+use crate::node::{Node, RenderNode};
 use crate::tabs::{Tab, ViewportTab};
 use crate::types::NodePin;
 
@@ -78,7 +79,7 @@ impl NodeViewer {
         let mut output_nodes = FastHashSet::default();
 
         for (node_id, node) in snarl.nodes_ids_mut() {
-            if let Some(output_node) = node.output_node_mut() {
+            if let Some(output_node) = node.output_mut() {
                 output_node.set_open_tabs(open_tabs.iter().copied());
                 output_nodes.insert(node_id);
             }
@@ -134,8 +135,8 @@ impl NodeViewer {
         let selector = RenderSelector::ByTargetTitle(tab.title());
         for render_node_data in &self.render_nodes {
             if render_node_data.select(selector) {
-                match snarl.get_node(render_node_data.id).and_then(Node::render_node_ref) {
-                    Some(RenderNode::Triangle(render)) => {
+                match snarl.get_node(render_node_data.id).and_then(Node::render_ref) {
+                    Some(RenderNode::TriangleRender(render)) => {
                         render.draw(*viewport, painter);
                     },
                     None => (),
@@ -148,8 +149,8 @@ impl NodeViewer {
         let selector = RenderSelector::ByTargetTitle(tab.title());
         for render_node_data in &self.render_nodes {
             if render_node_data.select(selector) {
-                match snarl[render_node_data.id].as_render_node_mut() {
-                    RenderNode::Triangle(render) => {
+                match snarl[render_node_data.id].as_render_mut() {
+                    RenderNode::TriangleRender(render) => {
                         let drag = response.drag_delta().x;
                         render.recalc_angle(drag as _);
                     },
@@ -159,8 +160,8 @@ impl NodeViewer {
     }
 
     fn register_render_if_needed(&mut self, from_node_id: NodeId, to_node_id: NodeId, snarl: &mut Snarl<Node>) {
-        if let Some(output_node) = snarl[to_node_id].output_node_ref() {
-            if let Some(render_node) = snarl[from_node_id].render_node_ref() {
+        if let Some(output_node) = snarl[to_node_id].output_ref() {
+            if let Some(render_node) = snarl[from_node_id].render_ref() {
                 if let Some(title) = output_node.selected_title().cloned() {
                     let render_node_data = RenderNodeData {
                         id: from_node_id,
@@ -197,7 +198,7 @@ impl NodeViewer {
                 .iter()
                 .any(|render_node_data| render_node_data.id == node_id)
             {
-                if let Some(render_node) = snarl.get_node(node_id).and_then(Node::render_node_ref) {
+                if let Some(render_node) = snarl.get_node(node_id).and_then(Node::render_ref) {
                     render_node.unregister(&self.config.render_state);
                 }
             }
@@ -206,7 +207,7 @@ impl NodeViewer {
 
     fn create_node(&mut self, pos: egui::Pos2, factory: fn(&NodeConfig) -> Node, snarl: &mut Snarl<Node>) -> NodeId {
         let node = factory(&self.config);
-        let is_output_node = node.output_node_ref().is_some();
+        let is_output_node = node.output_ref().is_some();
         let node_id = snarl.insert_node(pos, node);
 
         if is_output_node {
@@ -216,7 +217,7 @@ impl NodeViewer {
     }
 
     fn remove_node(&mut self, node_id: NodeId, snarl: &mut Snarl<Node>) -> Node {
-        if snarl[node_id].output_node_ref().is_some() {
+        if snarl[node_id].output_ref().is_some() {
             self.output_nodes.remove(&node_id);
             self.unregister_render_if_needed(RenderSelector::ByOutputId(node_id), snarl);
         }
@@ -286,7 +287,7 @@ impl SnarlViewer<Node> for NodeViewer {
     }
 
     fn has_body(&mut self, node: &Node) -> bool {
-        node.output_node_ref().is_some()
+        node.output_ref().is_some()
     }
 
     fn show_body(&mut self, node: NodeId, inputs: &[InPin], outputs: &[OutPin], ui: &mut Ui, snarl: &mut Snarl<Node>) {

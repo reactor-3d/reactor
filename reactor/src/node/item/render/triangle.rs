@@ -5,9 +5,9 @@ use egui_snarl::ui::PinInfo;
 use egui_snarl::{InPin, OutPin};
 use serde::{Deserialize, Serialize};
 
-use crate::node::NodeFlags;
 use crate::node::message::{MessageHandling, SelfNodeMut};
 use crate::node::viewer::{number_input_remote_value, number_input_view};
+use crate::node::{NodeFlags, Noded};
 use crate::types::NodePin;
 
 #[derive(Clone, Default, Serialize, Deserialize)]
@@ -20,14 +20,6 @@ impl TriangleRenderNode {
     pub const INPUTS: [u64; 1] = [NodeFlags::TYPICAL_NUMBER_INPUT.bits()];
     pub const OUTPUTS: [u64; 1] = [NodeFlags::RENDER_TRIANGLE.bits()];
 
-    pub fn inputs(&self) -> &[u64] {
-        &Self::INPUTS
-    }
-
-    pub fn outputs(&self) -> &[u64] {
-        &Self::OUTPUTS
-    }
-
     pub fn register(&self, render_state: &RenderState) {
         TriangleRenderResources::register(render_state);
     }
@@ -35,9 +27,7 @@ impl TriangleRenderNode {
     pub fn unregister(&self, render_state: &RenderState) {
         TriangleRenderResources::unregister(render_state);
     }
-}
 
-impl TriangleRenderNode {
     pub fn recalc_angle(&mut self, drag: f64) {
         self.angle.set(self.angle.get() + drag * 0.01);
     }
@@ -47,6 +37,20 @@ impl TriangleRenderNode {
             angle: self.angle.get(),
         });
         painter.add(callback);
+    }
+}
+
+impl Noded for TriangleRenderNode {
+    fn name(&self) -> &str {
+        Self::NAME
+    }
+
+    fn inputs(&self) -> &[u64] {
+        &Self::INPUTS
+    }
+
+    fn outputs(&self) -> &[u64] {
+        &Self::OUTPUTS
     }
 }
 

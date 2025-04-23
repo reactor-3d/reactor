@@ -1,18 +1,17 @@
 use bitflags::bitflags;
 use eframe::wgpu::naga::FastIndexSet;
 use egui_snarl::{NodeId, Snarl};
+use enum_dispatch::enum_dispatch;
 use message::InputMessage;
+use reactor_derives::EnumAs;
 use serde::{Deserialize, Serialize};
 
+use self::item::{OutputNode, RenderNode, TriangleRenderNode};
 use self::message::{CommonNodeMessage, CommonNodeResponse, MessageHandling, SelfNodeMut};
-use self::output::OutputNode;
-use self::render::RenderNode;
-use self::render::triangle::TriangleRenderNode;
 use self::viewer::NodeConfig;
 
+pub mod item;
 pub mod message;
-pub mod output;
-pub mod render;
 pub mod subscribtion;
 pub mod viewer;
 
@@ -30,7 +29,15 @@ bitflags! {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[enum_dispatch]
+pub trait Noded {
+    fn name(&self) -> &str;
+    fn inputs(&self) -> &[u64];
+    fn outputs(&self) -> &[u64];
+}
+
+#[derive(Clone, EnumAs, Serialize, Deserialize)]
+#[enum_dispatch(Noded)]
 pub enum Node {
     Render(RenderNode),
     Output(OutputNode),
@@ -42,7 +49,8 @@ impl Node {
         [
             (
                 TriangleRenderNode::NAME,
-                (|_| Node::Render(RenderNode::Triangle(TriangleRenderNode::default()))) as fn(&NodeConfig) -> Node,
+                (|_| Node::Render(RenderNode::TriangleRender(TriangleRenderNode::default())))
+                    as fn(&NodeConfig) -> Node,
                 TriangleRenderNode::INPUTS.as_slice(),
                 TriangleRenderNode::OUTPUTS.as_slice(),
             ),
@@ -60,27 +68,6 @@ impl Node {
         ]
     }
 
-    pub const fn name(&self) -> &str {
-        match self {
-            Self::Render(RenderNode::Triangle(_)) => TriangleRenderNode::NAME,
-            Self::Output(_) => OutputNode::NAME,
-        }
-    }
-
-    pub fn inputs(&self) -> &[u64] {
-        match self {
-            Self::Render(render) => render.inputs(),
-            Self::Output(output) => output.inputs(),
-        }
-    }
-
-    pub fn outputs(&self) -> &[u64] {
-        match self {
-            Self::Render(render) => render.outputs(),
-            Self::Output(output) => output.outputs(),
-        }
-    }
-
     pub fn call_handle_msg<'a>(
         self_id: NodeId,
         snarl: &mut Snarl<Node>,
@@ -96,46 +83,6 @@ impl Node {
         match self_node.node_ref() {
             Self::Render(_) => RenderNode::handle_msg(self_node, msg),
             Self::Output(_) => OutputNode::handle_msg(self_node, msg),
-        }
-    }
-
-    pub fn render_node_ref(&self) -> Option<&RenderNode> {
-        match self {
-            Self::Render(render_node) => Some(render_node),
-            _ => None,
-        }
-    }
-
-    pub fn as_render_node_ref(&self) -> &RenderNode {
-        self.render_node_ref()
-            .unwrap_or_else(|| panic!("Node `{}` is not a `{}`", self.name(), RenderNode::NAME))
-    }
-
-    pub fn as_render_node_mut(&mut self) -> &mut RenderNode {
-        match self {
-            Self::Render(render_node) => render_node,
-            node => panic!("Node `{}` is not an `{}`", node.name(), RenderNode::NAME),
-        }
-    }
-
-    pub fn output_node_ref(&self) -> Option<&OutputNode> {
-        match self {
-            Self::Output(output_node) => Some(output_node),
-            _ => None,
-        }
-    }
-
-    pub fn output_node_mut(&mut self) -> Option<&mut OutputNode> {
-        match self {
-            Self::Output(output_node) => Some(output_node),
-            _ => None,
-        }
-    }
-
-    pub fn as_output_node_mut(&mut self) -> &mut OutputNode {
-        match self {
-            Self::Output(output_node) => output_node,
-            node => panic!("Node `{}` is not an `{}`", node.name(), OutputNode::NAME),
         }
     }
 }
