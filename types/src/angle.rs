@@ -2,31 +2,32 @@ use std::ops;
 
 use serde::{Deserialize, Serialize};
 
+use crate::Float;
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize, Deserialize)]
-pub struct Angle {
-    degrees: f64,
+pub struct Angle<T = Float>
+where
+    T: AngleInner,
+{
+    degrees: T,
 }
 
-impl Angle {
-    #[allow(dead_code)]
-    pub fn degrees(degrees: f64) -> Self {
+impl<T: AngleInner + Copy> Angle<T> {
+    pub fn degrees(degrees: T) -> Self {
         Self { degrees }
     }
 
-    #[allow(dead_code)]
-    pub fn radians(radians: f64) -> Self {
+    pub fn as_degrees(&self) -> T {
+        self.degrees
+    }
+
+    pub fn radians(radians: T) -> Self {
         Self {
             degrees: radians.to_degrees(),
         }
     }
 
-    #[allow(dead_code)]
-    pub fn as_degrees(&self) -> f64 {
-        self.degrees
-    }
-
-    #[allow(dead_code)]
-    pub fn as_radians(&self) -> f64 {
+    pub fn as_radians(&self) -> T {
         self.degrees.to_radians()
     }
 
@@ -36,25 +37,57 @@ impl Angle {
     }
 }
 
-impl From<f64> for Angle {
-    fn from(value: f64) -> Self {
-        Self { degrees: value }
-    }
+pub trait AngleInner {
+    fn to_degrees(self) -> Self;
+
+    fn to_radians(self) -> Self;
+
+    fn clamp(self, min: Self, max: Self) -> Self;
 }
 
-impl AsRef<f64> for Angle {
-    fn as_ref(&self) -> &f64 {
-        &self.degrees
-    }
+macro_rules! angle_inner_impl {
+    ($t:ty) => {
+        impl AngleInner for $t {
+            fn to_degrees(self) -> Self {
+                self.to_degrees()
+            }
+
+            fn to_radians(self) -> Self {
+                self.to_radians()
+            }
+
+            fn clamp(self, min: Self, max: Self) -> Self {
+                self.clamp(min, max)
+            }
+        }
+
+        impl From<$t> for Angle<$t> {
+            fn from(value: $t) -> Self {
+                Self { degrees: value }
+            }
+        }
+
+        impl AsRef<$t> for Angle<$t> {
+            fn as_ref(&self) -> &$t {
+                &self.degrees
+            }
+        }
+
+        impl AsMut<$t> for Angle<$t> {
+            fn as_mut(&mut self) -> &mut $t {
+                &mut self.degrees
+            }
+        }
+    };
 }
 
-impl AsMut<f64> for Angle {
-    fn as_mut(&mut self) -> &mut f64 {
-        &mut self.degrees
-    }
-}
+angle_inner_impl!(f32);
+angle_inner_impl!(f64);
 
-impl ops::Add for Angle {
+impl<T> ops::Add for Angle<T>
+where
+    T: AngleInner + ops::Add<Output = T>,
+{
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self {

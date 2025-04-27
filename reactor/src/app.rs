@@ -12,7 +12,7 @@ use crate::tabs::Tab;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, Hash)]
 #[repr(u32)]
-pub enum IdKey {
+pub enum UiIdKey {
     Nodes = 0,
     RenderArea,
     EditingArea,
@@ -64,7 +64,7 @@ impl TabViewer for AppContext {
                 // Render area in the background
                 let render_area_ui = ui.new_child(
                     UiBuilder::new()
-                        .layer_id(LayerId::new(Order::Background, tab.id(IdKey::RenderArea)))
+                        .layer_id(LayerId::new(Order::Background, tab.id(UiIdKey::RenderArea)))
                         .max_rect(last_panel_rect)
                         .sense(Sense::empty()),
                 );
@@ -75,7 +75,7 @@ impl TabViewer for AppContext {
                     // Editing area with nodes in the middle
                     let mut editing_area_ui = ui.new_child(
                         UiBuilder::new()
-                            .layer_id(LayerId::new(Order::Middle, tab.id(IdKey::EditingArea)))
+                            .layer_id(LayerId::new(Order::Middle, tab.id(UiIdKey::EditingArea)))
                             .max_rect(last_panel_rect)
                             .sense(Sense::empty()),
                     );
@@ -90,7 +90,7 @@ impl TabViewer for AppContext {
                     editing_area_ui.set_opacity(opacity);
 
                     SnarlWidget::new()
-                        .id(tab.id(IdKey::Nodes))
+                        .id(tab.id(UiIdKey::Nodes))
                         .style(self.settings.snarl_style)
                         .show(&mut self.snarl, &mut self.viewer, &mut editing_area_ui);
                 }
@@ -99,13 +99,13 @@ impl TabViewer for AppContext {
                     // Overlay mouse blocker in the foreground
                     let render_area_ui = ui.new_child(
                         UiBuilder::new()
-                            .layer_id(LayerId::new(Order::Foreground, tab.id(IdKey::OverlayArea)))
+                            .layer_id(LayerId::new(Order::Foreground, tab.id(UiIdKey::OverlayArea)))
                             .max_rect(last_panel_rect)
                             .sense(Sense::empty()),
                     );
                     let overlay_response = render_area_ui.interact(
                         last_panel_rect,
-                        tab.id(IdKey::OverlayBlocker),
+                        tab.id(UiIdKey::OverlayBlocker),
                         Sense::click_and_drag(),
                     );
 

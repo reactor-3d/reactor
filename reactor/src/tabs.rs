@@ -1,7 +1,7 @@
 use eframe::wgpu::naga::FastHashMap;
 use serde::{Deserialize, Serialize};
 
-use crate::app::IdKey;
+use crate::app::UiIdKey;
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub enum Tab {
@@ -51,7 +51,7 @@ impl Tab {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ViewportTab {
     title: String,
-    cached_ids: FastHashMap<IdKey, egui::Id>,
+    cached_ids: FastHashMap<UiIdKey, egui::Id>,
 }
 
 impl Default for ViewportTab {
@@ -68,7 +68,7 @@ impl ViewportTab {
         &self.title
     }
 
-    pub fn id(&mut self, key: IdKey) -> egui::Id {
+    pub fn id(&mut self, key: UiIdKey) -> egui::Id {
         if let Some(id) = self.cached_ids.get(&key) {
             *id
         } else {

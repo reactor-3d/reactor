@@ -4,12 +4,12 @@ use egui::emath::Numeric;
 use egui::{Color32, Ui, WidgetText};
 use egui_snarl::ui::{AnyPins, PinInfo, SnarlViewer};
 use egui_snarl::{InPin, InPinId, NodeId, OutPin, OutPinId, Snarl};
+use reactor_types::NodePin;
 
 use super::Noded;
 use crate::node::message::{CommonNodeResponse, DisplayMessage, DisplayResponse, InputMessage, InterfaceMessage};
 use crate::node::{Node, RenderNode};
 use crate::tabs::{Tab, ViewportTab};
-use crate::types::NodePin;
 
 pub const STRING_COLOR: Color32 = Color32::from_rgb(0x00, 0xb0, 0x00);
 pub const NUMBER_COLOR: Color32 = Color32::from_rgb(0xb0, 0x00, 0x00);

@@ -3,12 +3,12 @@ use eframe::wgpu::util::DeviceExt;
 use egui::{PaintCallbackInfo, Ui};
 use egui_snarl::ui::PinInfo;
 use egui_snarl::{InPin, OutPin};
+use reactor_types::NodePin;
 use serde::{Deserialize, Serialize};
 
 use crate::node::message::{MessageHandling, SelfNodeMut};
 use crate::node::viewer::{number_input_remote_value, number_input_view};
 use crate::node::{NodeFlags, Noded};
-use crate::types::NodePin;
 
 #[derive(Clone, Default, Serialize, Deserialize)]
 pub struct TriangleRenderNode {

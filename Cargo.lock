@@ -2822,8 +2822,8 @@ dependencies = [
  "egui_dock",
  "egui_extras",
  "enum_dispatch",
- "nalgebra",
  "reactor-derives",
+ "reactor-types",
  "serde",
  "serde_json",
 ]
@@ -2836,6 +2836,14 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "reactor-types"
+version = "0.1.0"
+dependencies = [
+ "nalgebra",
+ "serde",
 ]
 
 [[package]]
