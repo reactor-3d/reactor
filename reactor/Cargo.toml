@@ -15,6 +15,6 @@ egui_dock = { version = "0.16", features = ["serde"] }
 egui_extras = { version = "0.31", features = ["all_loaders"] }
 enum_dispatch = "0.3"
 reactor-derives = { path = "../derives" }
-reactor-types = { path = "../types" }
+reactor-types = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

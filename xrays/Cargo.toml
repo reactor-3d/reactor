@@ -1,0 +1,19 @@
+[package]
+name = "xrays"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+hw-skymodel = "0.1"
+bitflags = { workspace = true }
+bytemuck = { workspace = true }
+nalgebra = { workspace = true }
+reactor-types = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+wgpu = "25.0"
+image = "0.25"
+
+[build-dependencies]
+naga = { version = "24.0", features = ["wgsl-out"] }
+naga_oil = "0.17"

@@ -1,0 +1,19 @@
+#define_import_path consts
+
+const EPSILON = 0.001f;
+
+// π
+const PI = 3.14159265358979323846264338327950288f;
+
+// 1/π
+const FRAC_1_PI = 0.318309886183790671537767526745028724f;
+
+// π/2
+const FRAC_PI_2 = 1.57079632679489661923132169163975144f;
+
+const MIN_T = 0.001f;
+const MAX_T = 1000f;
+
+const CHANNEL_R = 0u;
+const CHANNEL_G = 1u;
+const CHANNEL_B = 2u;
