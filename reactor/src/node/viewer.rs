@@ -159,7 +159,11 @@ impl NodeViewer {
                             .camera_id()
                             .and_then(|camera_id| snarl.get_node_mut(camera_id).and_then(Node::camera_mut))
                         {
-                            ui.input(|i| camera.after_events(i));
+                            if response.hovered() {
+                                ui.input(|i| {
+                                    camera.after_events(i);
+                                });
+                            }
                         }
                     },
                 }

@@ -97,12 +97,15 @@ impl TabViewer for AppContext {
 
                 if let Some(EditMode::View) = self.settings.edit_modes.get(tab.title()) {
                     // Overlay mouse blocker in the foreground
-                    let render_area_ui = ui.new_child(
+                    let mut render_area_ui = ui.new_child(
                         UiBuilder::new()
                             .layer_id(LayerId::new(Order::Foreground, tab.id(UiIdKey::OverlayArea)))
                             .max_rect(last_panel_rect)
                             .sense(Sense::empty()),
                     );
+
+                    render_area_ui.set_max_size(last_panel_rect.size());
+
                     let overlay_response = render_area_ui.interact(
                         last_panel_rect,
                         tab.id(UiIdKey::OverlayBlocker),
