@@ -8,9 +8,11 @@ use reactor_derives::EnumAs;
 use serde::{Deserialize, Serialize};
 
 use self::item::material::{CheckerboardNode, DielectricNode, EmissiveNode, LambertianNode, MetalNode};
+use self::item::primitive::SphereNode;
+use self::item::render::{TriangleRenderNode, XraysRenderNode};
 use self::item::{
-    CollectionNode, ColorNode, MaterialNode, NumberNode, OutputNode, PrimitiveNode, RenderNode, SphereNode, StringNode,
-    TextureNode, TriangleRenderNode, VectorNode,
+    CameraNode, CollectionNode, ColorNode, MaterialNode, NumberNode, OutputNode, PrimitiveNode, RenderNode, SceneNode,
+    StringNode, TextureNode, VectorNode,
 };
 use self::message::{CommonNodeMessage, CommonNodeResponse, MessageHandling, SelfNodeMut};
 use self::subscribtion::Subscription;
@@ -85,6 +87,8 @@ pub enum Node {
     Material(MaterialNode),
     Texture(TextureNode),
     Collection(CollectionNode),
+    Scene(SceneNode),
+    Camera(CameraNode),
     Render(RenderNode),
     Output(OutputNode),
 }
@@ -178,10 +182,32 @@ impl Node {
                 CollectionNode::OUTPUTS.as_slice(),
             ),
             (
+                SceneNode::NAME,
+                |_| Node::Scene(SceneNode::default()),
+                SceneNode::INPUTS.as_slice(),
+                SceneNode::OUTPUTS.as_slice(),
+            ),
+            (
+                CameraNode::NAME,
+                |_| Node::Camera(CameraNode::default()),
+                CameraNode::INPUTS.as_slice(),
+                CameraNode::OUTPUTS.as_slice(),
+            ),
+            (
                 TriangleRenderNode::NAME,
                 |_| Node::Render(RenderNode::TriangleRender(TriangleRenderNode::default())),
                 TriangleRenderNode::INPUTS.as_slice(),
                 TriangleRenderNode::OUTPUTS.as_slice(),
+            ),
+            (
+                XraysRenderNode::NAME,
+                |config| {
+                    Node::Render(RenderNode::XraysRender(XraysRenderNode::new(
+                        config.max_viewport_resolution,
+                    )))
+                },
+                XraysRenderNode::INPUTS.as_slice(),
+                XraysRenderNode::OUTPUTS.as_slice(),
             ),
             (
                 OutputNode::NAME,
@@ -218,6 +244,8 @@ impl Node {
             Self::Material(_) => MaterialNode::handle_msg(self_node, msg),
             Self::Texture(_) => TextureNode::handle_msg(self_node, msg),
             Self::Collection(_) => CollectionNode::handle_msg(self_node, msg),
+            Self::Scene(_) => SceneNode::handle_msg(self_node, msg),
+            Self::Camera(_) => CameraNode::handle_msg(self_node, msg),
             Self::Render(_) => RenderNode::handle_msg(self_node, msg),
             Self::Output(_) => OutputNode::handle_msg(self_node, msg),
         }

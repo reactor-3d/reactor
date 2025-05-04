@@ -1,16 +1,19 @@
-use camera::{Camera, GpuCamera};
 use reactor_types::rect::RectSize;
-use sampling::{GpuSamplingParams, SamplingParams};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use vertex::{Vertex, VertexUniforms};
 use wgpu;
 use wgpu::util::DeviceExt;
 use world::SkyParams;
 
 use crate::buffer::{StorageBuffer, UniformBuffer};
-use crate::scene::{Scene, SceneBuffersGroup};
+pub use crate::camera::Camera;
+use crate::camera::GpuCamera;
+use crate::sampling::GpuSamplingParams;
+pub use crate::sampling::SamplingParams;
+use crate::scene::SceneBuffersGroup;
+pub use crate::scene::{Material, Scene, Sphere};
 pub use crate::texture::Texture;
+use crate::vertex::{Vertex, VertexUniforms};
 
 pub mod buffer;
 pub mod camera;

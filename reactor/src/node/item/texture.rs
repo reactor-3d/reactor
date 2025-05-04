@@ -2,7 +2,7 @@ use egui::Ui;
 use egui_snarl::ui::PinInfo;
 use egui_snarl::{InPin, OutPin};
 use reactor_derives::Noded;
-use reactor_types::NodePin;
+use reactor_types::{Float, NodePin};
 use serde::{Deserialize, Serialize};
 
 use crate::node::message::{MessageHandling, SelfNodeMut};
@@ -13,7 +13,7 @@ use crate::node::{NodeFlags, Noded};
 #[derive(Clone, Serialize, Deserialize, Noded)]
 pub struct TextureNode {
     path: String,
-    scale: NodePin<f64>,
+    scale: NodePin<Float>,
 
     #[serde(skip)]
     subscription: Subscription,
@@ -33,6 +33,14 @@ impl TextureNode {
     pub const NAME: &str = "Texture";
     pub const INPUTS: [u64; 1] = [NodeFlags::TYPICAL_NUMBER_INPUT.bits()];
     pub const OUTPUTS: [u64; 1] = [NodeFlags::TEXTURE.bits() | NodeFlags::STRING.bits()];
+
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+
+    pub fn scale(&self) -> Float {
+        self.scale.get()
+    }
 }
 
 impl MessageHandling for TextureNode {

@@ -29,6 +29,14 @@ impl MetalNode {
     ];
     pub const OUTPUTS: [u64; 1] = [NodeFlags::MATERIAL_METAL.bits()];
 
+    pub fn albedo(&self) -> Color {
+        self.albedo.get()
+    }
+
+    pub fn fuzz(&self) -> Float {
+        self.fuzz.get()
+    }
+
     pub fn texture(&self) -> Option<NodeId> {
         self.texture.get()
     }

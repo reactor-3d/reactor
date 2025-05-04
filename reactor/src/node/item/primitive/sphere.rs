@@ -2,6 +2,7 @@ use egui::Ui;
 use egui_snarl::ui::PinInfo;
 use egui_snarl::{InPin, NodeId, OutPin};
 use reactor_derives::Noded;
+use reactor_types::vector::convert_vector3_down;
 use reactor_types::{Float, NodePin, Vector};
 use serde::{Deserialize, Serialize};
 
@@ -40,6 +41,15 @@ impl SphereNode {
         NodeFlags::MATERIALS.bits(),
     ];
     pub const OUTPUTS: [u64; 1] = [NodeFlags::PRIMITIVE_SPHERE.bits()];
+
+    pub fn material(&self) -> &InputMaterial {
+        self.material.as_ref()
+    }
+
+    pub fn to_xrays_sphere(&self, material_idx: u32) -> xrays::Sphere {
+        let center = self.center.get().as_dim3();
+        xrays::Sphere::new(convert_vector3_down(&center), self.radius.get() as _, material_idx)
+    }
 }
 
 impl MessageHandling for SphereNode {

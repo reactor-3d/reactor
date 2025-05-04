@@ -22,6 +22,10 @@ impl DielectricNode {
     pub const NAME: &str = "Dielectric Material";
     pub const INPUTS: [u64; 1] = [NodeFlags::TYPICAL_NUMBER_INPUT.bits()];
     pub const OUTPUTS: [u64; 1] = [NodeFlags::MATERIAL_DIELECTRIC.bits()];
+
+    pub fn ior(&self) -> Float {
+        self.ior.get()
+    }
 }
 
 impl MessageHandling for DielectricNode {

@@ -35,6 +35,10 @@ impl LambertianNode {
     pub const INPUTS: [u64; 2] = [NodeFlags::TYPICAL_VECTOR_INPUT.bits(), NodeFlags::TEXTURE.bits()];
     pub const OUTPUTS: [u64; 1] = [NodeFlags::MATERIAL_LAMBERT.bits()];
 
+    pub fn albedo(&self) -> Color {
+        self.albedo.get()
+    }
+
     pub fn texture(&self) -> Option<NodeId> {
         self.texture.get()
     }

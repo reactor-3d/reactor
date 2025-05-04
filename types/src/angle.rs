@@ -1,8 +1,25 @@
-use std::ops;
+use std::{fmt, ops};
 
 use serde::{Deserialize, Serialize};
 
 use crate::Float;
+
+pub fn convert_angle<T, U>(angle: Angle<T>) -> Angle<U>
+where
+    T: AngleInner,
+    U: AngleInner + TryFrom<T>,
+    <U as TryFrom<T>>::Error: fmt::Debug,
+{
+    Angle {
+        degrees: U::try_from(angle.degrees).expect("Could not convert angle"),
+    }
+}
+
+pub fn convert_angle_down(angle: Angle<f64>) -> Angle<f32> {
+    Angle {
+        degrees: angle.degrees as _,
+    }
+}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct Angle<T = Float>

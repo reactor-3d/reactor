@@ -8,6 +8,8 @@ pub mod remote;
 pub mod ui;
 pub mod widget;
 
+use super::item::render::XraysRenderNode;
+use super::message::SelfNodeMut;
 use crate::node::message::{CommonNodeResponse, DisplayMessage, DisplayResponse, InputMessage, InterfaceMessage};
 use crate::node::{Node, Noded, RenderNode};
 use crate::tabs::{Tab, ViewportTab};
@@ -134,13 +136,16 @@ impl NodeViewer {
                     Some(RenderNode::TriangleRender(render)) => {
                         render.draw(*viewport, painter);
                     },
+                    Some(RenderNode::XraysRender(_render)) => {
+                        XraysRenderNode::draw(SelfNodeMut::new(render_node_data.id, snarl), *viewport, painter);
+                    },
                     None => (),
                 }
             }
         }
     }
 
-    pub fn after_show(&mut self, tab: &ViewportTab, _ui: &mut Ui, response: &egui::Response, snarl: &mut Snarl<Node>) {
+    pub fn after_show(&mut self, tab: &ViewportTab, ui: &mut Ui, response: &egui::Response, snarl: &mut Snarl<Node>) {
         let selector = RenderSelector::ByTargetTitle(tab.title());
         for render_node_data in &self.render_nodes {
             if render_node_data.select(selector) {
@@ -148,6 +153,14 @@ impl NodeViewer {
                     RenderNode::TriangleRender(render) => {
                         let drag = response.drag_delta().x;
                         render.recalc_angle(drag as _);
+                    },
+                    RenderNode::XraysRender(render) => {
+                        if let Some(camera) = render
+                            .camera_id()
+                            .and_then(|camera_id| snarl.get_node_mut(camera_id).and_then(Node::camera_mut))
+                        {
+                            ui.input(|i| camera.after_events(i));
+                        }
                     },
                 }
             }

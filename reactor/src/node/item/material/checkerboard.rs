@@ -36,6 +36,14 @@ impl CheckerboardNode {
         NodeFlags::TYPICAL_VECTOR_INPUT.bits(),
     ];
     pub const OUTPUTS: [u64; 1] = [NodeFlags::MATERIAL_CHECKERBOARD.bits()];
+
+    pub fn even(&self) -> Color {
+        self.even.get()
+    }
+
+    pub fn odd(&self) -> Color {
+        self.odd.get()
+    }
 }
 
 impl MessageHandling for CheckerboardNode {

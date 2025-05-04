@@ -1,11 +1,15 @@
 use egui_snarl::{InPin, NodeId, OutPinId, Snarl};
+use reactor_types::cast::ForceCast;
 use reactor_types::{Color, Float, Vector, Vector4};
 
 use crate::node::{Node, Noded};
 
-pub fn number<'a>(pin: &InPin, name: &str, snarl: &'a Snarl<Node>) -> Option<Float> {
+pub fn number<'a, N>(pin: &InPin, name: &str, snarl: &'a Snarl<Node>) -> Option<N>
+where
+    Float: ForceCast<N>,
+{
     value(pin, name, |remote| match &snarl[remote.node] {
-        Node::Number(number) => Ok(number.value()),
+        Node::Number(number) => Ok(number.value().force_cast()),
         node => Err(node),
     })
 }

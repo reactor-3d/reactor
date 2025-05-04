@@ -2,7 +2,7 @@ use enum_dispatch::enum_dispatch;
 use reactor_derives::EnumAs;
 use serde::{Deserialize, Serialize};
 
-use self::sphere::SphereNode;
+pub use self::sphere::SphereNode;
 use crate::node::message::{CommonNodeMessage, CommonNodeResponse, MessageHandling, SelfNodeMut};
 
 pub mod sphere;

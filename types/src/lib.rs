@@ -6,6 +6,7 @@ pub use self::ray::Ray;
 pub use self::vector::{Basis, Vector, Vector2, Vector3, Vector4};
 
 pub mod angle;
+pub mod cast;
 pub mod pin;
 pub mod ray;
 pub mod rect;

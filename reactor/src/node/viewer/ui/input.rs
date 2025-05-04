@@ -3,6 +3,7 @@ use egui::epaint::Hsva;
 use egui::{Ui, WidgetText};
 use egui_snarl::ui::PinInfo;
 use egui_snarl::{InPin, NodeId};
+use reactor_types::cast::ForceCast;
 use reactor_types::{Color, Float, NodePin, Vector};
 
 use super::{MATERIAL_COLOR, NUMBER_COLOR, UNTYPED_COLOR, VECTOR_COLOR, horizontal};
@@ -30,21 +31,16 @@ where
     PinInfo::circle().with_fill(NUMBER_COLOR)
 }
 
-pub fn as_number_view<N, M>(
-    ui: &mut Ui,
-    label: &str,
-    node_pin: &mut NodePin<N>,
-    remote_value: Option<(&'static str, M)>,
-) -> PinInfo
+pub fn as_number_view<N, M>(ui: &mut Ui, label: &str, node_pin: &mut NodePin<N>, remote_value: Option<M>) -> PinInfo
 where
-    N: AsMut<f64>,
+    N: AsMut<Float>,
     M: Into<N>,
 {
     horizontal(ui, label, |ui| {
         let enabled = match remote_value {
             None => true,
             Some(remote) => {
-                node_pin.set(remote.1.into());
+                node_pin.set(remote.into());
                 false
             },
         };
@@ -107,19 +103,51 @@ pub fn empty_view(ui: &mut Ui, label: impl Into<WidgetText>) -> PinInfo {
     PinInfo::circle().with_fill(UNTYPED_COLOR)
 }
 
-pub fn display_number_field(
+pub fn display_number_field<N>(
     ui: &mut Ui,
     pin: &InPin,
     mut self_node: SelfNodeMut,
     label: &str,
-    field_accessor: impl FnOnce(&mut Node) -> &mut NodePin<Float>,
-) -> PinInfo {
+    field_accessor: impl FnOnce(&mut Node) -> &mut NodePin<N>,
+) -> PinInfo
+where
+    N: Numeric,
+    Float: ForceCast<N>,
+{
     let remote_value = remote::number(pin, label, self_node.snarl);
     let node = self_node.node_mut();
     let field = field_accessor(node);
 
     let old_value = field.get();
     let info = number_view(ui, label, field, remote_value);
+
+    if old_value != field.get() {
+        if let Some(caller) = node
+            .subscription_ref()
+            .and_then(|subscription| subscription.event_caller(Event::OnChange))
+        {
+            caller(self_node)
+        }
+    }
+    info
+}
+
+pub fn display_as_number_field<N>(
+    ui: &mut Ui,
+    pin: &InPin,
+    mut self_node: SelfNodeMut,
+    label: &str,
+    field_accessor: impl FnOnce(&mut Node) -> &mut NodePin<N>,
+) -> PinInfo
+where
+    N: Copy + AsMut<Float> + From<Float> + PartialEq,
+{
+    let remote_value: Option<Float> = remote::number(pin, label, self_node.snarl);
+    let node = self_node.node_mut();
+    let field = field_accessor(node);
+
+    let old_value = field.get();
+    let info = as_number_view(ui, label, field, remote_value);
 
     if old_value != field.get() {
         if let Some(caller) = node
@@ -182,6 +210,32 @@ pub fn display_color_field(
     info
 }
 
+pub fn display_node_field(
+    ui: &mut Ui,
+    pin: &InPin,
+    mut self_node: SelfNodeMut,
+    label: &str,
+    filter: impl FnOnce(&Node) -> bool,
+    field_accessor: impl FnOnce(&mut Node) -> &mut NodePin<Option<NodeId>>,
+) -> PinInfo {
+    let remote_value = remote::node(pin, label, self_node.snarl, filter);
+    let node = self_node.node_mut();
+    let field = field_accessor(node);
+
+    let old_value = field.get();
+    field.set(remote_value);
+
+    if old_value != field.get() {
+        if let Some(caller) = node
+            .subscription_ref()
+            .and_then(|subscription| subscription.event_caller(Event::OnChange))
+        {
+            caller(self_node)
+        }
+    }
+    empty_view(ui, label)
+}
+
 pub fn display_material_field(
     ui: &mut Ui,
     pin: &InPin,
@@ -211,26 +265,16 @@ pub fn display_material_field(
 pub fn display_texture_field(
     ui: &mut Ui,
     pin: &InPin,
-    mut self_node: SelfNodeMut,
+    self_node: SelfNodeMut,
     label: &str,
     field_accessor: impl FnOnce(&mut Node) -> &mut NodePin<Option<NodeId>>,
 ) -> PinInfo {
-    let remote_value = remote::node(pin, label, self_node.snarl, |remote_node| {
-        matches!(remote_node, Node::Texture(_))
-    });
-    let node = self_node.node_mut();
-    let field = field_accessor(node);
-
-    let old_value = field.get();
-    field.set(remote_value);
-
-    if old_value != field.get() {
-        if let Some(caller) = node
-            .subscription_ref()
-            .and_then(|subscription| subscription.event_caller(Event::OnChange))
-        {
-            caller(self_node)
-        }
-    }
-    empty_view(ui, label)
+    display_node_field(
+        ui,
+        pin,
+        self_node,
+        label,
+        |remote_node| matches!(remote_node, Node::Texture(_)),
+        field_accessor,
+    )
 }
