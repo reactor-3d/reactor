@@ -1,14 +1,15 @@
 use egui::{ComboBox, Ui};
 use egui_snarl::ui::PinInfo;
 use egui_snarl::{InPin, OutPin};
+use reactor_derives::Noded;
 use serde::{Deserialize, Serialize};
 
 use crate::node::message::{MessageHandling, SelectedTab, SelfNodeMut};
-use crate::node::viewer::empty_input_view;
+use crate::node::viewer::ui::input;
 use crate::node::{NodeFlags, Noded};
 use crate::tabs::Tab;
 
-#[derive(Clone, Default, Serialize, Deserialize)]
+#[derive(Clone, Default, Serialize, Deserialize, Noded)]
 pub struct OutputNode {
     tab_titles: Vec<String>,
     selected_title: Option<String>,
@@ -72,24 +73,10 @@ impl OutputNode {
     }
 }
 
-impl Noded for OutputNode {
-    fn name(&self) -> &str {
-        Self::NAME
-    }
-
-    fn inputs(&self) -> &[u64] {
-        &Self::INPUTS
-    }
-
-    fn outputs(&self) -> &[u64] {
-        &Self::OUTPUTS
-    }
-}
-
 impl MessageHandling for OutputNode {
     fn handle_display_input(_self_node: SelfNodeMut, pin: &InPin, ui: &mut Ui) -> Option<PinInfo> {
         Some(match pin.id.input {
-            0 => empty_input_view(ui, "Output"),
+            0 => input::empty_view(ui, "Output"),
             _ => unreachable!(),
         })
     }
@@ -100,7 +87,7 @@ impl MessageHandling for OutputNode {
         _outputs: &[OutPin],
         ui: &mut Ui,
     ) -> Option<SelectedTab<'a>> {
-        let output = self_node.as_output_node_mut();
+        let output = self_node.node_mut().as_output_mut();
 
         let mut target = ComboBox::from_id_salt("Target");
         if let Some(title) = &output.selected_title {
@@ -140,7 +127,7 @@ impl MessageHandling for OutputNode {
 
     fn handle_interface_open_tab(mut self_node: SelfNodeMut, tab: &Tab) {
         if let Tab::Viewport(viewport) = tab {
-            let output = self_node.as_output_node_mut();
+            let output = self_node.node_mut().as_output_mut();
             if !output.contains_tab(viewport.title()) {
                 output.tab_titles.push(viewport.title().to_string());
             }
@@ -149,7 +136,7 @@ impl MessageHandling for OutputNode {
 
     fn handle_interface_close_tab(mut self_node: SelfNodeMut, tab: &Tab) {
         if let Tab::Viewport(viewport) = tab {
-            let output = self_node.as_output_node_mut();
+            let output = self_node.node_mut().as_output_mut();
             output.remove_tab(viewport.title());
         }
     }

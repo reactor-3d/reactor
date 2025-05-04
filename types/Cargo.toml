@@ -4,5 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+ecolor = "0.31"
 nalgebra = { workspace = true }
 serde = { workspace = true }

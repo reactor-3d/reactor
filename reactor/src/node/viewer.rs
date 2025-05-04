@@ -1,21 +1,16 @@
 use eframe::egui_wgpu::RenderState;
 use eframe::wgpu::naga::{FastHashSet, FastIndexSet};
-use egui::emath::Numeric;
-use egui::{Color32, Ui, WidgetText};
+use egui::Ui;
 use egui_snarl::ui::{AnyPins, PinInfo, SnarlViewer};
 use egui_snarl::{InPin, InPinId, NodeId, OutPin, OutPinId, Snarl};
-use reactor_types::NodePin;
 
-use super::Noded;
+pub mod remote;
+pub mod ui;
+pub mod widget;
+
 use crate::node::message::{CommonNodeResponse, DisplayMessage, DisplayResponse, InputMessage, InterfaceMessage};
-use crate::node::{Node, RenderNode};
+use crate::node::{Node, Noded, RenderNode};
 use crate::tabs::{Tab, ViewportTab};
-
-pub const STRING_COLOR: Color32 = Color32::from_rgb(0x00, 0xb0, 0x00);
-pub const NUMBER_COLOR: Color32 = Color32::from_rgb(0xb0, 0x00, 0x00);
-pub const VECTOR_COLOR: Color32 = Color32::from_rgb(0x00, 0x00, 0xb0);
-pub const MATERIAL_COLOR: Color32 = Color32::from_rgb(0xb0, 0x00, 0xb0);
-pub const UNTYPED_COLOR: Color32 = Color32::from_rgb(0xb0, 0xb0, 0xb0);
 
 pub struct NodeConfig {
     pub render_state: RenderState,
@@ -278,11 +273,10 @@ impl SnarlViewer<Node> for NodeViewer {
 
     #[allow(refining_impl_trait)]
     fn show_output(&mut self, pin: &OutPin, ui: &mut Ui, snarl: &mut Snarl<Node>) -> PinInfo {
-        match &mut snarl[pin.id.node] {
-            Node::Output(_) => {
-                unreachable!("Output node has no outputs")
-            },
-            _ => PinInfo::circle().with_fill(UNTYPED_COLOR),
+        let response = Node::call_handle_msg(pin.id.node, snarl, DisplayMessage::Output { pin, ui });
+        match response {
+            Some(CommonNodeResponse::Display(DisplayResponse::Info(pin_info))) => pin_info,
+            _ => unreachable!("{} node has no outputs", snarl[pin.id.node].name()),
         }
     }
 
@@ -442,6 +436,18 @@ impl SnarlViewer<Node> for NodeViewer {
         snarl: &mut Snarl<Node>,
     ) {
         match snarl[node] {
+            Node::Number(_) => {
+                ui.label("Outputs float number value");
+            },
+            Node::String(_) => {
+                ui.label("Outputs string value");
+            },
+            Node::Vector(_) => {
+                ui.label("Outputs vector value");
+            },
+            Node::Color(_) => {
+                ui.label("Outputs color value");
+            },
             Node::Output(_) => {
                 ui.label("Displays anything connected to it");
             },
@@ -460,6 +466,8 @@ impl SnarlViewer<Node> for NodeViewer {
         snarl: &Snarl<Node>,
     ) -> egui::Frame {
         match snarl[node] {
+            Node::Number(_) => frame.fill(egui::Color32::from_rgb(70, 40, 40)),
+            Node::String(_) => frame.fill(egui::Color32::from_rgb(40, 70, 40)),
             Node::Output(_) => frame.fill(egui::Color32::from_rgb(70, 70, 80)),
             _ => frame.fill(egui::Color32::from_rgb(40, 40, 70)),
         }
@@ -469,66 +477,4 @@ impl SnarlViewer<Node> for NodeViewer {
 pub fn format_float(value: f64) -> String {
     let value = (value * 1000.0).round() / 1000.0;
     format!("{value}")
-}
-
-pub fn number_input_remote_value(pin: &InPin, snarl: &Snarl<Node>, label: &str) -> Option<(&'static str, f64)> {
-    match &*pin.remotes {
-        [] => None,
-        [remote] => Some(match &snarl[remote.node] {
-            node => unreachable!("{label} input not suppor connection with `{}`", node.name()),
-        }),
-        _ => None,
-    }
-}
-
-pub fn number_input_view<N>(
-    ui: &mut Ui,
-    label: &str,
-    node_pin: &mut NodePin<N>,
-    remote_value: Option<(&'static str, N)>,
-) -> PinInfo
-where
-    N: Numeric,
-{
-    ui.horizontal(|ui| {
-        ui.label(label);
-        let enabled = match remote_value {
-            None => true,
-            Some(remote) => {
-                node_pin.set(remote.1);
-                false
-            },
-        };
-        ui.add_enabled(enabled, egui::DragValue::new(node_pin.as_mut()));
-    });
-    PinInfo::circle().with_fill(NUMBER_COLOR)
-}
-
-pub fn as_number_input_view<N, M>(
-    ui: &mut Ui,
-    label: &str,
-    node_pin: &mut NodePin<N>,
-    remote_value: Option<(&'static str, M)>,
-) -> PinInfo
-where
-    N: AsMut<f64>,
-    M: Into<N>,
-{
-    ui.horizontal(|ui| {
-        ui.label(label);
-        let enabled = match remote_value {
-            None => true,
-            Some(remote) => {
-                node_pin.set(remote.1.into());
-                false
-            },
-        };
-        ui.add_enabled(enabled, egui::DragValue::new(node_pin.as_mut().as_mut()));
-    });
-    PinInfo::circle().with_fill(NUMBER_COLOR)
-}
-
-pub fn empty_input_view(ui: &mut Ui, label: impl Into<WidgetText>) -> PinInfo {
-    ui.label(label);
-    PinInfo::circle().with_fill(UNTYPED_COLOR)
 }

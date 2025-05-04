@@ -3,16 +3,17 @@ use eframe::wgpu::util::DeviceExt;
 use egui::{PaintCallbackInfo, Ui};
 use egui_snarl::ui::PinInfo;
 use egui_snarl::{InPin, OutPin};
-use reactor_types::NodePin;
+use reactor_derives::Noded;
+use reactor_types::{Float, NodePin};
 use serde::{Deserialize, Serialize};
 
 use crate::node::message::{MessageHandling, SelfNodeMut};
-use crate::node::viewer::{number_input_remote_value, number_input_view};
+use crate::node::viewer::ui::{input, output};
 use crate::node::{NodeFlags, Noded};
 
-#[derive(Clone, Default, Serialize, Deserialize)]
+#[derive(Clone, Default, Serialize, Deserialize, Noded)]
 pub struct TriangleRenderNode {
-    pub angle: NodePin<f64>,
+    angle: NodePin<Float>,
 }
 
 impl TriangleRenderNode {
@@ -28,7 +29,7 @@ impl TriangleRenderNode {
         TriangleRenderResources::unregister(render_state);
     }
 
-    pub fn recalc_angle(&mut self, drag: f64) {
+    pub fn recalc_angle(&mut self, drag: Float) {
         self.angle.set(self.angle.get() + drag * 0.01);
     }
 
@@ -40,40 +41,18 @@ impl TriangleRenderNode {
     }
 }
 
-impl Noded for TriangleRenderNode {
-    fn name(&self) -> &str {
-        Self::NAME
-    }
-
-    fn inputs(&self) -> &[u64] {
-        &Self::INPUTS
-    }
-
-    fn outputs(&self) -> &[u64] {
-        &Self::OUTPUTS
-    }
-}
-
 impl MessageHandling for TriangleRenderNode {
-    fn handle_display_input(mut self_node: SelfNodeMut, pin: &InPin, ui: &mut Ui) -> Option<PinInfo> {
-        Some(match pin.id.input {
-            0 => {
-                const LABEL: &str = "Angle";
-
-                let remote_value = number_input_remote_value(pin, self_node.snarl, LABEL);
-                let node = self_node.as_render_node_mut().as_triangle_render_mut();
-                number_input_view(ui, LABEL, &mut node.angle, remote_value)
-            },
-            _ => unreachable!(),
-        })
+    fn handle_display_input(self_node: SelfNodeMut, pin: &InPin, ui: &mut Ui) -> Option<PinInfo> {
+        match pin.id.input {
+            0 => Some(input::display_number_field(ui, pin, self_node, "Angle", |node| {
+                &mut node.as_render_mut().as_triangle_render_mut().angle
+            })),
+            _ => None,
+        }
     }
 
-    fn handle_input_disconnect(mut self_node: SelfNodeMut, _from: &OutPin, to: &InPin) {
-        let node = self_node.as_render_node_mut().as_triangle_render_mut();
-        match to.id.input {
-            0 => node.angle.reset(),
-            _ => unreachable!(),
-        }
+    fn handle_display_output(_self_node: SelfNodeMut, _pin: &OutPin, _ui: &mut Ui) -> Option<PinInfo> {
+        Some(output::empty_view())
     }
 }
 

@@ -3,9 +3,8 @@ use egui::Ui;
 use egui_snarl::ui::PinInfo;
 use egui_snarl::{InPin, NodeId, OutPin, Snarl};
 
-use super::Node;
-use super::item::{OutputNode, RenderNode};
 use super::subscribtion::{Event, EventCallback};
+use super::{Node, Noded};
 use crate::tabs::Tab;
 
 pub enum InputMessage<'a> {
@@ -53,6 +52,10 @@ pub enum DisplayMessage<'a> {
     Body {
         inputs: &'a [InPin],
         outputs: &'a [OutPin],
+        ui: &'a mut Ui,
+    },
+    Output {
+        pin: &'a OutPin,
         ui: &'a mut Ui,
     },
 }
@@ -140,18 +143,6 @@ impl SelfNodeMut<'_> {
     pub fn node_mut(&mut self) -> &mut Node {
         self.node_by_id_mut(self.id)
     }
-
-    pub fn as_render_node_ref(&self) -> &RenderNode {
-        self.node_ref().as_render_ref()
-    }
-
-    pub fn as_render_node_mut(&mut self) -> &mut RenderNode {
-        self.node_mut().as_render_mut()
-    }
-
-    pub fn as_output_node_mut(&mut self) -> &mut OutputNode {
-        self.node_mut().as_output_mut()
-    }
 }
 
 pub trait MessageHandling {
@@ -173,10 +164,28 @@ pub trait MessageHandling {
     }
 
     #[allow(unused_variables)]
-    fn handle_input_connect(self_node: SelfNodeMut, from: &OutPin, to: &InPin) {}
+    fn handle_input_connect(self_node: SelfNodeMut, from: &OutPin, to: &InPin) {
+        let node = self_node.node_ref();
+        if let Some(caller) = node
+            .subscription_ref()
+            .and_then(|subscription| subscription.event_caller(Event::OnChange))
+        {
+            caller(self_node)
+        }
+    }
 
     #[allow(unused_variables)]
-    fn handle_input_disconnect(self_node: SelfNodeMut, from: &OutPin, to: &InPin) {}
+    fn handle_input_disconnect(mut self_node: SelfNodeMut, from: &OutPin, to: &InPin) {
+        let node = self_node.node_mut();
+        if node.reset_input(to) {
+            if let Some(caller) = node
+                .subscription_ref()
+                .and_then(|subscription| subscription.event_caller(Event::OnChange))
+            {
+                caller(self_node)
+            }
+        }
+    }
 
     #[allow(unused_variables)]
     fn handle_input_collect_ids(
@@ -186,24 +195,29 @@ pub trait MessageHandling {
     ) {
     }
 
-    fn handle_event(self_node: SelfNodeMut, event_msg: EventMessage) -> Option<EventResponse> {
-        match event_msg {
-            EventMessage::HasSubscription { node_id, event } => {
-                let response = Self::handle_event_has_subscription(self_node, node_id, event);
-                Some(EventResponse::HasSubscription(response))
-            },
-            EventMessage::Subscribe {
-                node_id,
-                event,
-                callback,
-            } => {
-                Self::handle_event_subscribe(self_node, node_id, event, callback);
-                None
-            },
-            EventMessage::Unsubscribe { node_id, event } => {
-                Self::handle_event_unsubscribe(self_node, node_id, event);
-                None
-            },
+    fn handle_event(mut self_node: SelfNodeMut, event_msg: EventMessage) -> Option<EventResponse> {
+        let node = self_node.node_mut();
+        if let Some(subscription) = node.subscription_mut() {
+            subscription.handle_event(event_msg)
+        } else {
+            match event_msg {
+                EventMessage::HasSubscription { node_id, event } => {
+                    let response = Self::handle_event_has_subscription(self_node, node_id, event);
+                    Some(EventResponse::HasSubscription(response))
+                },
+                EventMessage::Subscribe {
+                    node_id,
+                    event,
+                    callback,
+                } => {
+                    Self::handle_event_subscribe(self_node, node_id, event, callback);
+                    None
+                },
+                EventMessage::Unsubscribe { node_id, event } => {
+                    Self::handle_event_unsubscribe(self_node, node_id, event);
+                    None
+                },
+            }
         }
     }
 
@@ -226,6 +240,9 @@ pub trait MessageHandling {
             DisplayMessage::Body { inputs, outputs, ui } => {
                 Self::handle_display_body(self_node, inputs, outputs, ui).map(DisplayResponse::Selected)
             },
+            DisplayMessage::Output { pin, ui } => {
+                Self::handle_display_output(self_node, pin, ui).map(DisplayResponse::Info)
+            },
         }
     }
 
@@ -241,6 +258,11 @@ pub trait MessageHandling {
         outputs: &[OutPin],
         ui: &mut Ui,
     ) -> Option<SelectedTab<'a>> {
+        None
+    }
+
+    #[allow(unused_variables)]
+    fn handle_display_output(self_node: SelfNodeMut, pin: &OutPin, ui: &mut Ui) -> Option<PinInfo> {
         None
     }
 

@@ -15,10 +15,8 @@ pub enum RenderNode {
 }
 
 impl RenderNode {
-    pub const NAME: &str = "Render";
-
     pub fn handle_msg<'a>(self_node: SelfNodeMut<'a>, msg: CommonNodeMessage) -> Option<CommonNodeResponse<'a>> {
-        match self_node.as_render_node_ref() {
+        match self_node.node_ref().as_render_ref() {
             Self::TriangleRender(_) => TriangleRenderNode::handle_msg(self_node, msg),
         }
     }

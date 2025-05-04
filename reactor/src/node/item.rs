@@ -1,6 +1,23 @@
+pub mod collection;
+pub mod color;
+pub mod material;
+pub mod number;
 pub mod output;
+pub mod primitive;
 pub mod render;
+pub mod string;
+pub mod texture;
+pub mod vector;
 
+pub use self::collection::CollectionNode;
+pub use self::color::ColorNode;
+pub use self::material::{InputMaterial, MaterialNode};
+pub use self::number::NumberNode;
 pub use self::output::OutputNode;
+pub use self::primitive::PrimitiveNode;
+pub use self::primitive::sphere::SphereNode;
 pub use self::render::RenderNode;
 pub use self::render::triangle::TriangleRenderNode;
+pub use self::string::StringNode;
+pub use self::texture::TextureNode;
+pub use self::vector::VectorNode;
