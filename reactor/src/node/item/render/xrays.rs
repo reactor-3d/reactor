@@ -26,7 +26,7 @@ pub struct XraysRenderNode {
 
     max_viewport_resolution: u32,
     #[serde(skip)]
-    disconnect_scene: bool,
+    force_redraw: bool,
 }
 
 impl XraysRenderNode {
@@ -40,7 +40,7 @@ impl XraysRenderNode {
             scene: Default::default(),
 
             max_viewport_resolution,
-            disconnect_scene: false,
+            force_redraw: true,
         }
     }
 
@@ -74,7 +74,8 @@ impl XraysRenderNode {
     ];
     pub const OUTPUTS: [u64; 1] = [NodeFlags::RENDER_XRAYS.bits()];
 
-    pub fn register(&self, render_state: &RenderState) {
+    pub fn register(&mut self, render_state: &RenderState) {
+        self.force_redraw = true;
         RaytracerRenderResources::register(render_state, self, Default::default());
     }
 
@@ -97,23 +98,28 @@ impl XraysRenderNode {
             }
         });
 
+        let force_redraw = node.force_redraw;
         let scene = if let Some(scene_node_id) = node.scene {
-            if let SceneNodeResponse::Recalculated =
-                SceneNode::handle_recalculate(SelfNodeMut::new(scene_node_id, self_node.snarl))
+            if force_redraw
+                || SceneNodeResponse::Recalculated
+                    == SceneNode::handle_recalculate(SelfNodeMut::new(scene_node_id, self_node.snarl))
             {
                 Some(self_node.snarl[scene_node_id].as_scene_ref().as_scene().clone())
             } else {
                 None
             }
-        } else if node.disconnect_scene {
-            self_node.snarl[self_node.id]
-                .as_render_mut()
-                .as_xrays_render_mut()
-                .disconnect_scene = false;
+        } else if force_redraw {
             Some(Scene::stub())
         } else {
             None
         };
+
+        if force_redraw {
+            self_node.snarl[self_node.id]
+                .as_render_mut()
+                .as_xrays_render_mut()
+                .force_redraw = false;
+        }
 
         if let Some(render_params) = render_params {
             let callback = Callback::new_paint_callback(viewport, Drawer::new(render_params, scene));
@@ -143,7 +149,7 @@ impl Noded for XraysRenderNode {
             3 => self.camera.reset(),
             4 => {
                 self.scene = None;
-                self.disconnect_scene = true
+                self.force_redraw = true
             },
             _ => return false,
         }

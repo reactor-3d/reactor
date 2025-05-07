@@ -173,8 +173,9 @@ impl NodeViewer {
 
     fn register_render_if_needed(&mut self, from_node_id: NodeId, to_node_id: NodeId, snarl: &mut Snarl<Node>) {
         if let Some(output_node) = snarl[to_node_id].output_ref() {
-            if let Some(render_node) = snarl[from_node_id].render_ref() {
-                if let Some(title) = output_node.selected_title().cloned() {
+            let selected_title = output_node.selected_title().cloned();
+            if let Some(render_node) = snarl[from_node_id].render_mut() {
+                if let Some(title) = selected_title {
                     let render_node_data = RenderNodeData {
                         id: from_node_id,
                         output_id: to_node_id,

@@ -59,6 +59,14 @@ impl Noded for CollectionNode {
     fn outputs(&self) -> &[u64] {
         &Self::OUTPUTS
     }
+
+    fn subscription_ref(&self) -> Option<&Subscription> {
+        Some(&self.subscription)
+    }
+
+    fn subscription_mut(&mut self) -> Option<&mut Subscription> {
+        Some(&mut self.subscription)
+    }
 }
 
 impl MessageHandling for CollectionNode {
