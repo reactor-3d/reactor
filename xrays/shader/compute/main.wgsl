@@ -1,38 +1,14 @@
 #import consts::{EPSILON, PI, FRAC_1_PI, CHANNEL_R, CHANNEL_G, CHANNEL_B}
 #import object::{intersection, Intersection, Sphere, spheres}
+#import rng
+#import sampling::SamplingParams
 #import types::Ray
-#import rng, tonemap
-
-@group(0) @binding(0) var<uniform> vertex_uniforms: VertexUniforms;
-
-struct VertexUniforms {
-    view_proj_matrix: mat4x4<f32>,
-    model_matrix: mat4x4<f32>,
-}
-
-struct VertexInput {
-    @location(0) position: vec2<f32>,
-    @location(1) tex_coords: vec2<f32>,
-}
-
-struct VertexOutput {
-    @builtin(position) clip_position: vec4<f32>,
-    @location(0) tex_coords: vec2<f32>,
-}
-
-@vertex
-fn vs_main(model: VertexInput) -> VertexOutput {
-    return VertexOutput(
-        vertex_uniforms.view_proj_matrix * vertex_uniforms.model_matrix * vec4<f32>(model.position, 0.0, 1.0),
-        model.tex_coords
-    );
-}
 
 @group(1) @binding(0) var<uniform> frame_data: vec4<u32>;
 @group(1) @binding(1) var<storage, read_write> image_buffer: array<array<f32, 3>>;
 
-@group(2) @binding(0) var<uniform> camera: Camera;
-@group(2) @binding(1) var<uniform> sampling_params: SamplingParams;
+@group(2) @binding(0) var<uniform> sampling_params: SamplingParams;
+@group(2) @binding(1) var<uniform> camera: Camera;
 @group(2) @binding(2) var<storage, read> sky_state: SkyState;
 
 // @group(3) @binding(0) var<storage, read> spheres: array<Sphere>;
@@ -40,37 +16,32 @@ fn vs_main(model: VertexInput) -> VertexOutput {
 @group(3) @binding(2) var<storage, read> textures: array<array<f32, 3>>;
 @group(3) @binding(3) var<storage, read> lights: array<u32>;
 
-@fragment
-fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let u = in.tex_coords.x;
-    let v = in.tex_coords.y;
-
+@compute @workgroup_size(8, 8)
+fn cs_main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let image_width = frame_data.x;
     let image_height = frame_data.y;
     let frame_number = frame_data.z;
 
-    let x = u32(u * f32(image_width));
-    let y = u32(v * f32(image_height));
+    let x = global_id.x;
+    let y = global_id.y;
+
+    if (x >= image_width || y >= image_height) {
+        return;
+    }
     let idx = image_width * y + x;
 
     var rng_state = rng::init(vec2(x, y), vec2(image_width, image_height), frame_number);
-    var pixel = vec3(image_buffer[idx][0u], image_buffer[idx][1u], image_buffer[idx][2u]);
+    var pixel = vec3(image_buffer[idx][0], image_buffer[idx][1], image_buffer[idx][2]);
     {
-        if sampling_params.clear_accumulated_samples == 1u {
+        if sampling_params.clear_accumulated_samples == 1 {
             pixel = vec3(0f);
         }
 
         let rgb = sample_pixel(x, y, &rng_state);
         pixel += rgb;
     }
+
     image_buffer[idx] = array<f32, 3>(pixel.r, pixel.g, pixel.b);
-
-    let inv_n = 1f / f32(sampling_params.accumulated_samples_per_pixel);
-
-    return vec4(
-        tonemap::uncharted2(inv_n * pixel),
-        1f
-    );
 }
 
 fn sample_pixel(x: u32, y: u32, rng_state: ptr<function, u32>) -> vec3<f32> {
@@ -358,13 +329,6 @@ struct SkyState {
     radiances: array<f32, 3>,
     sun_direction: vec3<f32>,
 };
-
-struct SamplingParams {
-    num_samples_per_pixel: u32,
-    num_bounces: u32,
-    accumulated_samples_per_pixel: u32,
-    clear_accumulated_samples: u32,
-}
 
 struct Material {
     id: u32,

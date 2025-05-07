@@ -84,10 +84,17 @@ impl XraysRenderNode {
 
     pub fn draw(self_node: SelfNodeMut, viewport: egui::Rect, painter: &egui::Painter) {
         let node = self_node.node_ref().as_render_ref().as_xrays_render_ref();
-        let render_params = node.camera_node(self_node.snarl).map(|camera_node| RenderParams {
-            camera: camera_node.to_xrays_camera(),
-            sky: Default::default(),
-            sampling: node.sampling_params(),
+        let render_params = node.camera_node(self_node.snarl).map(|camera_node| {
+            let viewport_size = RectSize {
+                width: viewport.width() as _,
+                height: viewport.height() as _,
+            };
+            RenderParams {
+                camera: camera_node.to_xrays_camera(),
+                viewport_size,
+                sky: Default::default(),
+                sampling: node.sampling_params(),
+            }
         });
 
         let scene = if let Some(scene_node_id) = node.scene {
@@ -109,7 +116,7 @@ impl XraysRenderNode {
         };
 
         if let Some(render_params) = render_params {
-            let callback = Callback::new_paint_callback(viewport, Drawer { render_params, scene });
+            let callback = Callback::new_paint_callback(viewport, Drawer::new(render_params, scene));
             painter.add(callback);
         }
     }
@@ -220,21 +227,23 @@ struct Drawer {
     scene: Option<Scene>,
 }
 
+impl Drawer {
+    fn new(render_params: RenderParams, scene: Option<Scene>) -> Self {
+        Self { render_params, scene }
+    }
+}
+
 impl CallbackTrait for Drawer {
     fn prepare(
         &self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        screen_descriptor: &ScreenDescriptor,
-        _egui_encoder: &mut wgpu::CommandEncoder,
+        _screen_descriptor: &ScreenDescriptor,
+        encoder: &mut wgpu::CommandEncoder,
         callback_resources: &mut CallbackResources,
     ) -> Vec<wgpu::CommandBuffer> {
         if let Some(resources) = callback_resources.get_mut::<RaytracerRenderResources>() {
-            let viewport_size = RectSize {
-                width: screen_descriptor.size_in_pixels[0],
-                height: screen_descriptor.size_in_pixels[1],
-            };
-            resources.prepare(device, queue, &self.render_params, self.scene.as_ref(), viewport_size);
+            resources.prepare(device, queue, encoder, &self.render_params, self.scene.as_ref());
         }
         Vec::new()
     }
@@ -256,32 +265,21 @@ pub struct RaytracerRenderResources {
 }
 
 impl RaytracerRenderResources {
-    pub fn new(
-        render_state: &RenderState,
-        render_params: &RenderParams,
-        viewport_size: RectSize<u32>,
-        max_viewport_resolution: u32,
-    ) -> Self {
+    pub fn new(render_state: &RenderState, render_params: &RenderParams, max_viewport_resolution: u32) -> Self {
         let device = &render_state.device;
         let target_format = render_state.target_format;
         let scene = Scene::stub();
 
         Self {
-            renderer: xrays::Renderer::new(
-                device,
-                target_format,
-                &scene,
-                render_params,
-                viewport_size,
-                max_viewport_resolution,
-            )
-            .expect("Xrays renderer creation failed"),
+            renderer: xrays::Renderer::new(device, target_format, &scene, render_params, max_viewport_resolution)
+                .expect("Xrays renderer creation failed"),
         }
     }
 
     pub fn register(render_state: &RenderState, node: &XraysRenderNode, viewport_size: RectSize<u32>) {
         let render_params = RenderParams {
             camera: Default::default(),
+            viewport_size,
             sky: Default::default(),
             sampling: node.sampling_params(),
         };
@@ -289,7 +287,6 @@ impl RaytracerRenderResources {
         render_state.renderer.write().callback_resources.insert(Self::new(
             render_state,
             &render_params,
-            viewport_size,
             node.max_viewport_resolution,
         ));
     }
@@ -302,12 +299,12 @@ impl RaytracerRenderResources {
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
         render_params: &RenderParams,
         scene: Option<&Scene>,
-        viewport_size: RectSize<u32>,
     ) {
         self.renderer
-            .prepare_frame(device, queue, render_params, scene, viewport_size);
+            .prepare_frame(device, queue, encoder, render_params, scene);
     }
 
     pub fn paint(&self, rpass: &mut wgpu::RenderPass<'static>) {

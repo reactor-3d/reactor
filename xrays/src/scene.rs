@@ -227,10 +227,10 @@ impl GroupData {
 
         let scene_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             entries: &[
-                sphere_buffer.layout(wgpu::ShaderStages::FRAGMENT, true),
-                material_buffer.layout(wgpu::ShaderStages::FRAGMENT, true),
-                texture_buffer.layout(wgpu::ShaderStages::FRAGMENT, true),
-                light_buffer.layout(wgpu::ShaderStages::FRAGMENT, true),
+                sphere_buffer.layout(wgpu::ShaderStages::COMPUTE, true),
+                material_buffer.layout(wgpu::ShaderStages::COMPUTE, true),
+                texture_buffer.layout(wgpu::ShaderStages::COMPUTE, true),
+                light_buffer.layout(wgpu::ShaderStages::COMPUTE, true),
             ],
             label: Some("scene layout"),
         });

@@ -1,6 +1,8 @@
+use serde::{Deserialize, Serialize};
+
 use crate::Float;
 
-#[derive(Copy, Clone, Debug, Default, PartialEq)]
+#[derive(Copy, Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 pub struct RectSize<T = Float> {
     pub width: T,
     pub height: T,

@@ -42,7 +42,8 @@ pub struct Renderer {
     sampling_parameter_buffer: UniformBuffer,
     hw_sky_state_buffer: StorageBuffer,
 
-    pipeline: wgpu::RenderPipeline,
+    compute_pipeline: wgpu::ComputePipeline,
+    render_pipeline: wgpu::RenderPipeline,
     latest_render_params: RenderParams,
     render_progress: RenderProgress,
     frame_number: u32,
@@ -54,10 +55,9 @@ impl Renderer {
         target_format: wgpu::TextureFormat,
         scene: &Scene,
         render_params: &RenderParams,
-        viewport_size: RectSize<u32>,
         max_viewport_resolution: u32,
     ) -> Result<Self, RenderParamsValidationError> {
-        render_params.validate()?;
+        // render_params.validate()?;
 
         let uniforms = VertexUniforms {
             view_projection_matrix: unit_quad_projection_matrix(),
@@ -84,8 +84,8 @@ impl Renderer {
 
         let image_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             entries: &[
-                frame_data_buffer.layout(wgpu::ShaderStages::FRAGMENT),
-                image_buffer.layout(wgpu::ShaderStages::FRAGMENT, false),
+                frame_data_buffer.layout(wgpu::ShaderStages::COMPUTE | wgpu::ShaderStages::FRAGMENT),
+                image_buffer.layout(wgpu::ShaderStages::COMPUTE | wgpu::ShaderStages::FRAGMENT, false),
             ],
             label: Some("image layout"),
         });
@@ -95,18 +95,18 @@ impl Renderer {
             label: Some("image bind group"),
         });
 
-        let camera_buffer = {
-            let camera = GpuCamera::new(&render_params.camera, viewport_size);
-
-            UniformBuffer::new_from_bytes(device, bytemuck::bytes_of(&camera), 0, Some("camera buffer"))
-        };
-
         let sampling_parameter_buffer = UniformBuffer::new(
             device,
             std::mem::size_of::<GpuSamplingParams>() as wgpu::BufferAddress,
-            1,
+            0,
             Some("sampling parameter buffer"),
         );
+
+        let camera_buffer = {
+            let camera = GpuCamera::new(&render_params.camera, render_params.viewport_size);
+
+            UniformBuffer::new_from_bytes(device, bytemuck::bytes_of(&camera), 1, Some("camera buffer"))
+        };
 
         let hw_sky_state_buffer = {
             let sky_state = render_params.sky.to_sky_state()?;
@@ -116,9 +116,9 @@ impl Renderer {
 
         let parameter_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             entries: &[
-                camera_buffer.layout(wgpu::ShaderStages::FRAGMENT),
-                sampling_parameter_buffer.layout(wgpu::ShaderStages::FRAGMENT),
-                hw_sky_state_buffer.layout(wgpu::ShaderStages::FRAGMENT, true),
+                sampling_parameter_buffer.layout(wgpu::ShaderStages::COMPUTE | wgpu::ShaderStages::FRAGMENT),
+                camera_buffer.layout(wgpu::ShaderStages::COMPUTE | wgpu::ShaderStages::FRAGMENT),
+                hw_sky_state_buffer.layout(wgpu::ShaderStages::COMPUTE | wgpu::ShaderStages::FRAGMENT, true),
             ],
             label: Some("parameter layout"),
         });
@@ -126,8 +126,8 @@ impl Renderer {
         let parameter_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &parameter_bind_group_layout,
             entries: &[
-                camera_buffer.binding(),
                 sampling_parameter_buffer.binding(),
+                camera_buffer.binding(),
                 hw_sky_state_buffer.binding(),
             ],
             label: Some("parameter bind group"),
@@ -135,9 +135,13 @@ impl Renderer {
 
         let scene_group = SceneBuffersGroup::new(scene, device);
 
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            source: wgpu::ShaderSource::Wgsl(include_str!(concat!(env!("OUT_DIR"), "/shader_combined.wgsl")).into()),
-            label: Some("shader_combined.wgsl"),
+        let compute_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            source: wgpu::ShaderSource::Wgsl(include_str!(concat!(env!("OUT_DIR"), "/compute_shader.wgsl")).into()),
+            label: Some("compute_shader.wgsl"),
+        });
+        let render_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            source: wgpu::ShaderSource::Wgsl(include_str!(concat!(env!("OUT_DIR"), "/render_shader.wgsl")).into()),
+            label: Some("render_shader.wgsl"),
         });
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -150,16 +154,24 @@ impl Renderer {
             push_constant_ranges: &[],
             label: Some("raytracer layout"),
         });
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        let compute_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: Some("raytracing compute pipeline"),
+            layout: Some(&pipeline_layout),
+            module: &compute_shader,
+            entry_point: Some("cs_main"),
+            compilation_options: Default::default(),
+            cache: None,
+        });
+        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
-                module: &shader,
+                module: &render_shader,
                 entry_point: Some("vs_main"),
                 buffers: &[Vertex::desc()],
                 compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {
-                module: &shader,
+                module: &render_shader,
                 entry_point: Some("fs_main"),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: target_format,
@@ -187,7 +199,7 @@ impl Renderer {
                 mask: !0,
                 alpha_to_coverage_enabled: false,
             },
-            label: Some("raytracer pipeline"),
+            label: Some("raytracing render pipeline"),
             // If the pipeline will be used with a multiview render pass, this
             // indicates how many array layers the attachments will have.
             multiview: None,
@@ -213,7 +225,8 @@ impl Renderer {
             parameter_bind_group,
             scene_group,
             vertex_buffer,
-            pipeline,
+            compute_pipeline,
+            render_pipeline,
             latest_render_params: *render_params,
             render_progress,
             frame_number,
@@ -225,19 +238,12 @@ impl Renderer {
         queue: &wgpu::Queue,
         render_force: bool,
         render_params: &RenderParams,
-        viewport_size: RectSize<u32>,
     ) -> Result<(), RenderParamsValidationError> {
         if !render_force && *render_params == self.latest_render_params {
             return Ok(());
         }
 
         render_params.validate()?;
-        if viewport_size.width == 0 || viewport_size.height == 0 {
-            return Err(RenderParamsValidationError::ViewportSize(
-                viewport_size.width,
-                viewport_size.height,
-            ));
-        }
 
         {
             let sky_state = render_params.sky.to_sky_state()?;
@@ -245,7 +251,7 @@ impl Renderer {
         }
 
         {
-            let camera = GpuCamera::new(&render_params.camera, viewport_size);
+            let camera = GpuCamera::new(&render_params.camera, render_params.viewport_size);
             queue.write_buffer(self.camera_buffer.handle(), 0, bytemuck::bytes_of(&camera));
         }
 
@@ -267,11 +273,11 @@ impl Renderer {
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
         render_params: &RenderParams,
         scene: Option<&Scene>,
-        viewport_size: RectSize<u32>,
     ) {
-        self.set_render_params(queue, scene.is_some(), render_params, viewport_size)
+        self.set_render_params(queue, scene.is_some(), render_params)
             .expect("Render params should be valid");
 
         if let Some(scene) = scene {
@@ -287,14 +293,33 @@ impl Renderer {
         );
 
         let frame_number = self.frame_number;
-        let frame_data = [viewport_size.width, viewport_size.height, frame_number];
+        let frame_data = [
+            render_params.viewport_size.width,
+            render_params.viewport_size.height,
+            frame_number,
+        ];
         queue.write_buffer(self.frame_data_buffer.handle(), 0, bytemuck::cast_slice(&frame_data));
 
         self.frame_number += 1;
+
+        {
+            let workgroup_size_x = 8;
+            let workgroup_size_y = 8;
+            let workgroups_x = (render_params.viewport_size.width + workgroup_size_x - 1) / workgroup_size_x;
+            let workgroups_y = (render_params.viewport_size.height + workgroup_size_y - 1) / workgroup_size_y;
+
+            let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor::default());
+            compute_pass.set_pipeline(&self.compute_pipeline);
+            compute_pass.set_bind_group(0, &self.vertex_bind_group, &[]);
+            compute_pass.set_bind_group(1, &self.image_bind_group, &[]);
+            compute_pass.set_bind_group(2, &self.parameter_bind_group, &[]);
+            compute_pass.set_bind_group(3, self.scene_group.bind_group(), &[]);
+            compute_pass.dispatch_workgroups(workgroups_x, workgroups_y, 1);
+        }
     }
 
     pub fn render_frame(&self, render_pass: &mut wgpu::RenderPass) {
-        render_pass.set_pipeline(&self.pipeline);
+        render_pass.set_pipeline(&self.render_pipeline);
         render_pass.set_bind_group(0, &self.vertex_bind_group, &[]);
         render_pass.set_bind_group(1, &self.image_bind_group, &[]);
         render_pass.set_bind_group(2, &self.parameter_bind_group, &[]);
@@ -325,6 +350,7 @@ pub enum RenderParamsValidationError {
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct RenderParams {
     pub camera: Camera,
+    pub viewport_size: RectSize<u32>,
     pub sky: SkyParams,
     pub sampling: SamplingParams,
 }
@@ -351,6 +377,13 @@ impl RenderParams {
         if self.camera.focus_distance < 0.0 {
             return Err(RenderParamsValidationError::FocusDistanceOutOfRange(
                 self.camera.focus_distance,
+            ));
+        }
+
+        if self.viewport_size.width == 0 || self.viewport_size.height == 0 {
+            return Err(RenderParamsValidationError::ViewportSize(
+                self.viewport_size.width,
+                self.viewport_size.height,
             ));
         }
 
