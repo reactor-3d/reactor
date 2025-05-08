@@ -1,6 +1,11 @@
+use std::fs;
+use std::path::{Path, PathBuf};
+
+use eframe::egui_wgpu::RenderState;
 use eframe::{App, CreationContext};
 use egui::{Key, LayerId, Order, Sense, UiBuilder};
 use egui_dock::{DockArea, DockState, SurfaceIndex, TabViewer};
+use egui_file_dialog::FileDialog;
 use egui_snarl::Snarl;
 use egui_snarl::ui::SnarlWidget;
 use serde::{Deserialize, Serialize};
@@ -96,23 +101,20 @@ impl TabViewer for AppContext {
                 }
 
                 if let Some(EditMode::View) = self.settings.edit_modes.get(tab.title()) {
-                    // Overlay mouse blocker in the foreground
-                    let mut render_area_ui = ui.new_child(
-                        UiBuilder::new()
-                            .layer_id(LayerId::new(Order::Foreground, tab.id(UiIdKey::OverlayArea)))
-                            .max_rect(last_panel_rect)
-                            .sense(Sense::empty()),
-                    );
+                    // Overlay mouse blocker area on the top of the middle
+                    egui::Area::new(tab.id(UiIdKey::OverlayArea))
+                        .fixed_pos(last_panel_rect.min)
+                        .order(Order::Middle)
+                        .interactable(true)
+                        .show(ui.ctx(), |ui| {
+                            let overlay_response = ui.interact(
+                                last_panel_rect,
+                                tab.id(UiIdKey::OverlayBlocker),
+                                Sense::click_and_drag(),
+                            );
 
-                    render_area_ui.set_max_size(last_panel_rect.size());
-
-                    let overlay_response = render_area_ui.interact(
-                        last_panel_rect,
-                        tab.id(UiIdKey::OverlayBlocker),
-                        Sense::click_and_drag(),
-                    );
-
-                    self.viewer.after_show(tab, ui, &overlay_response, &mut self.snarl);
+                            self.viewer.after_show(tab, ui, &overlay_response, &mut self.snarl);
+                        });
                 }
             },
             Tab::Settings(_) => {
@@ -129,9 +131,19 @@ impl TabViewer for AppContext {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FileDialogMode {
+    Open,
+    Save,
+}
+
 pub struct Reactor3dApp {
     ctx: AppContext,
+    render_state: RenderState,
     tabs_tree: DockState<Tab>,
+    file_dialog: FileDialog,
+    file_dialog_mode: Option<FileDialogMode>,
+    opened_project_dir: Option<PathBuf>,
 }
 
 impl Reactor3dApp {
@@ -158,18 +170,15 @@ impl Reactor3dApp {
             .storage
             .and_then(|storage| {
                 storage
-                    .get_string("tabs_tree")
+                    .get_string("tabs")
                     .and_then(|tabs_tree| serde_json::from_str(&tabs_tree).ok())
             })
             .unwrap_or_else(|| DockState::<Tab>::new(Default::default()));
 
-        let screen_rect = cx.egui_ctx.input(|i| i.screen_rect());
-        let max_viewport_resolution = (screen_rect.width() * screen_rect.height() / 10.0) as u32;
-        println!("Max resolution: {max_viewport_resolution}");
-
+        let render_state = cx.wgpu_render_state.clone().expect("WGPU must be enabled");
         let viewer = NodeViewer::new(
-            cx.wgpu_render_state.clone().expect("WGPU must be enabled"),
-            max_viewport_resolution,
+            render_state.clone(),
+            max_viewport_resolution(&cx.egui_ctx),
             tabs_tree.iter_all_tabs().map(|((..), tab)| tab),
             &mut snarl,
         );
@@ -180,16 +189,114 @@ impl Reactor3dApp {
                 snarl,
                 viewer,
             },
+            render_state,
             tabs_tree,
+            file_dialog: FileDialog::new().as_modal(true),
+            file_dialog_mode: None,
+            opened_project_dir: None,
         }
+    }
+
+    fn open_project(&mut self, ctx: &egui::Context, path: impl Into<PathBuf>) {
+        let path = path.into();
+
+        let mut snarl = fs::read_to_string(path.join("snarl.json"))
+            .ok()
+            .and_then(|content| serde_json::from_str(&content).ok())
+            .unwrap_or_default();
+
+        let settings = fs::read_to_string(path.join("settings.json"))
+            .ok()
+            .and_then(|content| serde_json::from_str(&content).ok())
+            .unwrap_or_default();
+
+        let tabs_tree = fs::read_to_string(path.join("tabs.json"))
+            .ok()
+            .and_then(|content| serde_json::from_str(&content).ok())
+            .unwrap_or_else(|| DockState::<Tab>::new(Default::default()));
+
+        let viewer = NodeViewer::new(
+            self.render_state.clone(),
+            max_viewport_resolution(ctx),
+            tabs_tree.iter_all_tabs().map(|((..), tab)| tab),
+            &mut snarl,
+        );
+
+        self.ctx = AppContext {
+            settings,
+            snarl,
+            viewer,
+        };
+        self.tabs_tree = tabs_tree;
+        self.opened_project_dir = Some(path);
+    }
+
+    fn save_project(&self, path: impl AsRef<Path>) {
+        let path = path.as_ref();
+        fs::create_dir_all(path).expect("Failed to create project directory");
+        ();
+        fs::write(
+            path.join("snarl.json"),
+            serde_json::to_string_pretty(&self.ctx.snarl).expect("Failed to serialize snarl"),
+        )
+        .expect("Failed to save snarl");
+        fs::write(
+            path.join("settings.json"),
+            serde_json::to_string_pretty(&self.ctx.settings).expect("Failed to serialize settings"),
+        )
+        .expect("Failed to save settings");
+        fs::write(
+            path.join("tabs.json"),
+            serde_json::to_string_pretty(&self.tabs_tree).expect("Failed to serialize tabs"),
+        )
+        .expect("Failed to save tabs");
     }
 }
 
 impl App for Reactor3dApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        self.file_dialog.update(ctx);
+
+        if let Some(path) = self.file_dialog.take_picked() {
+            match self.file_dialog_mode.take() {
+                Some(mode) => {
+                    match mode {
+                        FileDialogMode::Open => {
+                            self.open_project(ctx, path);
+                        },
+                        FileDialogMode::Save => {
+                            self.save_project(&path);
+                            self.opened_project_dir = Some(path);
+                        },
+                    }
+                    ctx.request_repaint();
+                },
+                None => (),
+            }
+        }
+
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
                 ui.menu_button("File", |ui| {
+                    if ui.button("Open").clicked() {
+                        self.file_dialog.pick_directory();
+                        self.file_dialog_mode = Some(FileDialogMode::Open);
+                        ui.close_menu();
+                    }
+                    if ui.button("Save").clicked() {
+                        if let Some(path) = &self.opened_project_dir {
+                            self.save_project(path);
+                        } else {
+                            self.file_dialog.pick_directory();
+                            self.file_dialog_mode = Some(FileDialogMode::Save);
+                        }
+                        ui.close_menu();
+                    }
+                    if ui.button("Save As...").clicked() {
+                        self.file_dialog.pick_directory();
+                        self.file_dialog_mode = Some(FileDialogMode::Save);
+                        ui.close_menu();
+                    }
                     if ui.button("Quit").clicked() {
                         ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                     }
@@ -250,6 +357,16 @@ impl App for Reactor3dApp {
         storage.set_string("settings", settings);
 
         let tabs_tree = serde_json::to_string(&self.tabs_tree).unwrap();
-        storage.set_string("tabs_tree", tabs_tree);
+        storage.set_string("tabs", tabs_tree);
     }
+}
+
+fn max_viewport_resolution(ctx: &egui::Context) -> u32 {
+    let screen_rect = ctx.screen_rect();
+    let pixels_per_point = ctx.pixels_per_point();
+    let screen_size_in_pixels = egui::Vec2::new(4000.0, 4000.0).min(screen_rect.size() * pixels_per_point);
+
+    let max_viewport_resolution = (screen_size_in_pixels.x * screen_size_in_pixels.y) as u32;
+    println!("Max resolution: {max_viewport_resolution}");
+    max_viewport_resolution
 }

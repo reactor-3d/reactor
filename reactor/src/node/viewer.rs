@@ -182,7 +182,7 @@ impl NodeViewer {
                         target: RenderTarget::Viewport(title),
                     };
                     if !self.render_nodes.contains(&render_node_data) {
-                        render_node.register(&self.config.render_state);
+                        render_node.register(&self.config.render_state, self.config.max_viewport_resolution);
                         self.render_nodes.insert(render_node_data);
                     }
                 }

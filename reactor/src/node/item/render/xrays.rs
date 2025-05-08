@@ -74,9 +74,17 @@ impl XraysRenderNode {
     ];
     pub const OUTPUTS: [u64; 1] = [NodeFlags::RENDER_XRAYS.bits()];
 
-    pub fn register(&mut self, render_state: &RenderState) {
+    pub fn register(&mut self, render_state: &RenderState, max_viewport_resolution: u32) {
         self.force_redraw = true;
-        RaytracerRenderResources::register(render_state, self, Default::default());
+        self.max_viewport_resolution = max_viewport_resolution;
+
+        let init_side = (max_viewport_resolution as f64).sqrt() as u32;
+        let viewport_size = RectSize {
+            width: init_side,
+            height: init_side,
+        };
+
+        RaytracerRenderResources::register(render_state, self, viewport_size);
     }
 
     pub fn unregister(&self, render_state: &RenderState) {

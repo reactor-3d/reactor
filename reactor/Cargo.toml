@@ -9,6 +9,7 @@ bytemuck = { workspace = true }
 const_format = "0.2"
 eframe = { version = "0.31", features = ["serde", "persistence", "wgpu"] }
 egui = "0.31"
+egui-file-dialog = "0.9"
 egui-probe = { version = "0.8", features = ["derive"] }
 egui-scale = "0.1"
 egui-snarl = { git = "https://github.com/zakarumych/egui-snarl.git", features = ["serde", "egui-probe"] }

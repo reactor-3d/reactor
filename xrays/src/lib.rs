@@ -57,7 +57,7 @@ impl Renderer {
         render_params: &RenderParams,
         max_viewport_resolution: u32,
     ) -> Result<Self, RenderParamsValidationError> {
-        // render_params.validate()?;
+        render_params.validate()?;
 
         let uniforms = VertexUniforms {
             view_projection_matrix: unit_quad_projection_matrix(),
@@ -78,7 +78,7 @@ impl Renderer {
         let frame_data_buffer = UniformBuffer::new(device, 16_u64, 0, Some("frame data buffer"));
 
         let image_buffer = {
-            let buffer = vec![[0.0; 3]; max_viewport_resolution as usize];
+            let buffer = vec![[0.0_f32; 3]; max_viewport_resolution as usize];
             StorageBuffer::new_from_bytes(device, bytemuck::cast_slice(buffer.as_slice()), 1, Some("image buffer"))
         };
 

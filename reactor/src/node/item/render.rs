@@ -25,10 +25,10 @@ impl RenderNode {
         }
     }
 
-    pub fn register(&mut self, render_state: &RenderState) {
+    pub fn register(&mut self, render_state: &RenderState, max_viewport_resolution: u32) {
         match self {
-            Self::TriangleRender(render) => render.register(render_state),
-            Self::XraysRender(render) => render.register(render_state),
+            Self::TriangleRender(render) => render.register(render_state, max_viewport_resolution),
+            Self::XraysRender(render) => render.register(render_state, max_viewport_resolution),
         }
     }
 

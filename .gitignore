@@ -8,6 +8,7 @@
 # MSVC Windows builds of rustc generate these, which store debugging information
 *.pdb
 
+/scene
 Project.toml
 TODO.md
 NOTES.md

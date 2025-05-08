@@ -30,13 +30,6 @@ fn vs_main(model: VertexInput) -> VertexOutput {
 @group(1) @binding(1) var<storage, read_write> image_buffer: array<array<f32, 3>>;
 
 @group(2) @binding(0) var<uniform> sampling_params: SamplingParams;
-// @group(2) @binding(1) var<uniform> camera: Camera;
-// @group(2) @binding(2) var<storage, read> sky_state: SkyState;
-
-// @group(3) @binding(0) var<storage, read> spheres: array<Sphere>;
-// @group(3) @binding(1) var<storage, read> materials: array<Material>;
-// @group(3) @binding(2) var<storage, read> textures: array<array<f32, 3>>;
-// @group(3) @binding(3) var<storage, read> lights: array<u32>;
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
@@ -46,8 +39,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let image_width = frame_data.x;
     let image_height = frame_data.y;
 
-    let x = clamp(u32(floor(u * f32(image_width))), 0u, image_width - 1u);
-    let y = clamp(u32(floor(v * f32(image_height))), 0u, image_height - 1u);
+    let x = min(u32(u * f32(image_width)), image_width - 1u);
+    let y = min(u32(v * f32(image_height)), image_height - 1u);
     let idx = image_width * y + x;
 
     let inv_n = 1f / f32(sampling_params.accumulated_samples_per_pixel);

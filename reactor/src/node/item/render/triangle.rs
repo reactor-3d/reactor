@@ -21,7 +21,7 @@ impl TriangleRenderNode {
     pub const INPUTS: [u64; 1] = [NodeFlags::TYPICAL_NUMBER_INPUT.bits()];
     pub const OUTPUTS: [u64; 1] = [NodeFlags::RENDER_TRIANGLE.bits()];
 
-    pub fn register(&self, render_state: &RenderState) {
+    pub fn register(&self, render_state: &RenderState, _max_viewport_resolution: u32) {
         TriangleRenderResources::register(render_state);
     }
 
