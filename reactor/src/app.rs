@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use eframe::egui_wgpu::RenderState;
 use eframe::{App, CreationContext};
@@ -143,7 +143,7 @@ pub struct Reactor3dApp {
     tabs_tree: DockState<Tab>,
     file_dialog: FileDialog,
     file_dialog_mode: Option<FileDialogMode>,
-    opened_project_dir: Option<PathBuf>,
+    active_project_dir: Option<PathBuf>,
 }
 
 impl Reactor3dApp {
@@ -183,6 +183,8 @@ impl Reactor3dApp {
             &mut snarl,
         );
 
+        let file_dialog = FileDialog::new().as_modal(true);
+
         Self {
             ctx: AppContext {
                 settings,
@@ -191,9 +193,9 @@ impl Reactor3dApp {
             },
             render_state,
             tabs_tree,
-            file_dialog: FileDialog::new().as_modal(true),
+            file_dialog,
             file_dialog_mode: None,
-            opened_project_dir: None,
+            active_project_dir: None,
         }
     }
 
@@ -228,12 +230,12 @@ impl Reactor3dApp {
             viewer,
         };
         self.tabs_tree = tabs_tree;
-        self.opened_project_dir = Some(path);
+        self.active_project_dir = Some(path);
     }
 
-    fn save_project(&self, path: impl AsRef<Path>) {
-        let path = path.as_ref();
-        fs::create_dir_all(path).expect("Failed to create project directory");
+    fn save_project(&mut self, path: impl Into<PathBuf>) {
+        let path = path.into();
+        fs::create_dir_all(&path).expect("Failed to create project directory");
         ();
         fs::write(
             path.join("snarl.json"),
@@ -250,6 +252,19 @@ impl Reactor3dApp {
             serde_json::to_string_pretty(&self.tabs_tree).expect("Failed to serialize tabs"),
         )
         .expect("Failed to save tabs");
+        self.active_project_dir = Some(path);
+    }
+
+    fn select_open_project_dialog(&mut self) {
+        self.file_dialog.labels_mut().open_button = "🗀  Open".to_string();
+        self.file_dialog.pick_directory();
+        self.file_dialog_mode = Some(FileDialogMode::Open);
+    }
+
+    fn select_save_project_dialog(&mut self) {
+        self.file_dialog.labels_mut().open_button = "📥  Save".to_string();
+        self.file_dialog.pick_directory();
+        self.file_dialog_mode = Some(FileDialogMode::Save);
     }
 }
 
@@ -265,8 +280,7 @@ impl App for Reactor3dApp {
                             self.open_project(ctx, path);
                         },
                         FileDialogMode::Save => {
-                            self.save_project(&path);
-                            self.opened_project_dir = Some(path);
+                            self.save_project(path);
                         },
                     }
                     ctx.request_repaint();
@@ -279,22 +293,19 @@ impl App for Reactor3dApp {
             egui::menu::bar(ui, |ui| {
                 ui.menu_button("File", |ui| {
                     if ui.button("Open").clicked() {
-                        self.file_dialog.pick_directory();
-                        self.file_dialog_mode = Some(FileDialogMode::Open);
+                        self.select_open_project_dialog();
                         ui.close_menu();
                     }
                     if ui.button("Save").clicked() {
-                        if let Some(path) = &self.opened_project_dir {
+                        if let Some(path) = self.active_project_dir.take() {
                             self.save_project(path);
                         } else {
-                            self.file_dialog.pick_directory();
-                            self.file_dialog_mode = Some(FileDialogMode::Save);
+                            self.select_save_project_dialog();
                         }
                         ui.close_menu();
                     }
                     if ui.button("Save As...").clicked() {
-                        self.file_dialog.pick_directory();
-                        self.file_dialog_mode = Some(FileDialogMode::Save);
+                        self.select_save_project_dialog();
                         ui.close_menu();
                     }
                     if ui.button("Quit").clicked() {
