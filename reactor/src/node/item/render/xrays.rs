@@ -95,8 +95,8 @@ impl XraysRenderNode {
         let node = self_node.node_ref().as_render_ref().as_xrays_render_ref();
         let render_params = node.camera_node(self_node.snarl).map(|camera_node| {
             let viewport_size = RectSize {
-                width: viewport.width() as _,
-                height: viewport.height() as _,
+                width: viewport.width() as u32,
+                height: viewport.height() as u32,
             };
             RenderParams {
                 camera: camera_node.to_xrays_camera(),

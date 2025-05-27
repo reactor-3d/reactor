@@ -236,6 +236,10 @@ impl NodeViewer {
         }
         snarl.remove_node(node_id)
     }
+
+    pub fn unregister_render_nodes(&mut self, snarl: &mut Snarl<Node>) {
+        self.unregister_render_if_needed(RenderSelector::All, snarl);
+    }
 }
 
 impl SnarlViewer<Node> for NodeViewer {

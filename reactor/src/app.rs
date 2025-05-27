@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 
+use directories::ProjectDirs;
 use eframe::egui_wgpu::RenderState;
 use eframe::{App, CreationContext};
 use egui::{Key, LayerId, Order, Sense, UiBuilder};
@@ -185,7 +186,7 @@ impl Reactor3dApp {
 
         let file_dialog = FileDialog::new().as_modal(true);
 
-        Self {
+        let mut app = Self {
             ctx: AppContext {
                 settings,
                 snarl,
@@ -196,7 +197,15 @@ impl Reactor3dApp {
             file_dialog,
             file_dialog_mode: None,
             active_project_dir: None,
+        };
+
+        if let Some(data_dir) = storage_dir() {
+            let old_active_project_dir = app.active_project_dir.take();
+            app.open_project(&cx.egui_ctx, data_dir);
+            app.active_project_dir = old_active_project_dir;
         }
+
+        app
     }
 
     fn open_project(&mut self, ctx: &egui::Context, path: impl Into<PathBuf>) {
@@ -236,7 +245,7 @@ impl Reactor3dApp {
     fn save_project(&mut self, path: impl Into<PathBuf>) {
         let path = path.into();
         fs::create_dir_all(&path).expect("Failed to create project directory");
-        ();
+
         fs::write(
             path.join("snarl.json"),
             serde_json::to_string_pretty(&self.ctx.snarl).expect("Failed to serialize snarl"),
@@ -370,6 +379,16 @@ impl App for Reactor3dApp {
         let tabs_tree = serde_json::to_string(&self.tabs_tree).unwrap();
         storage.set_string("tabs", tabs_tree);
     }
+
+    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        if let Some(data_dir) = storage_dir() {
+            let old_active_project_dir = self.active_project_dir.take();
+            self.save_project(data_dir);
+            self.active_project_dir = old_active_project_dir;
+        }
+
+        self.ctx.viewer.unregister_render_nodes(&mut self.ctx.snarl);
+    }
 }
 
 fn max_viewport_resolution(ctx: &egui::Context) -> u32 {
@@ -380,4 +399,8 @@ fn max_viewport_resolution(ctx: &egui::Context) -> u32 {
     let max_viewport_resolution = (screen_size_in_pixels.x * screen_size_in_pixels.y) as u32;
     println!("Max resolution: {max_viewport_resolution}");
     max_viewport_resolution
+}
+
+fn storage_dir() -> Option<PathBuf> {
+    ProjectDirs::from("free", "reactor", "reactor").map(|dirs| dirs.data_dir().to_path_buf())
 }

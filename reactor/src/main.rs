@@ -11,6 +11,8 @@ mod settings;
 mod tabs;
 
 fn main() -> eframe::Result<()> {
+    env_logger::init();
+
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([800.0, 600.0])
@@ -45,7 +47,7 @@ fn main() -> eframe::Result<()> {
     };
 
     eframe::run_native(
-        "reactor-3d",
+        "reactor",
         native_options,
         Box::new(|cx| Ok(Box::new(Reactor3dApp::new(cx)))),
     )

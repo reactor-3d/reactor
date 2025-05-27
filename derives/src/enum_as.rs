@@ -37,7 +37,7 @@ pub fn enum_as_inner(ast: &DeriveInput) -> syn::Result<TokenStream> {
                 Some(quote! {
                     #[must_use]
                     #[inline]
-                    pub const fn #ref_fn_name(&self) -> ::core::option::Option<(#(&#types),*)> {
+                    pub fn #ref_fn_name(&self) -> ::core::option::Option<(#(&#types),*)> {
                         match self {
                             #enum_name::#variant_name (#(#field_names),*) => Some((#(#field_names),*)),
                             _ => None
@@ -46,7 +46,7 @@ pub fn enum_as_inner(ast: &DeriveInput) -> syn::Result<TokenStream> {
 
                     #[must_use]
                     #[inline]
-                    pub const fn #as_ref_fn_name(&self) -> (#(&#types),*) {
+                    pub fn #as_ref_fn_name(&self) -> (#(&#types),*) {
                         match self {
                             #enum_name::#variant_name (#(#field_names),*) => (#(#field_names),*),
                             _ => panic!("Unexpected enum variant for {}", stringify!(#variant_name))
