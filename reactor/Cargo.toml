@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 bitflags = { workspace = true }
 bytemuck = { workspace = true }
+config-load = "0.1"
 const_format = "0.2"
 directories = "6.0"
 eframe = { version = "0.31", features = ["serde", "wgpu"] }
@@ -17,9 +18,11 @@ egui-snarl = { git = "https://github.com/zakarumych/egui-snarl.git", features = 
 egui_dock = { version = "0.16", features = ["serde"] }
 egui_extras = { version = "0.31", features = ["all_loaders"] }
 enum_dispatch = "0.3"
-env_logger = "0.11"
 reactor-derives = { path = "../derives" }
 reactor-types = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 xrays = { path = "../xrays" }

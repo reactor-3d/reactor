@@ -1,17 +1,21 @@
+use std::error::Error;
 use std::sync::Arc;
 
 use eframe::egui_wgpu::{WgpuConfiguration, WgpuSetup, WgpuSetupCreateNew};
 use eframe::wgpu;
 
-use self::app::ReactorApp;
+use crate::app::ReactorApp;
+use crate::logger::LoggerConfig;
 
 mod app;
+mod logger;
 mod node;
 mod settings;
 mod tabs;
 
-fn main() -> eframe::Result<()> {
-    env_logger::init();
+fn main() -> Result<(), Box<dyn Error>> {
+    let logger_config = LoggerConfig::load(None)?;
+    logger::init(&logger_config)?;
 
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
@@ -50,5 +54,7 @@ fn main() -> eframe::Result<()> {
         "reactor",
         native_options,
         Box::new(|cx| Ok(Box::new(ReactorApp::new(cx)))),
-    )
+    )?;
+
+    Ok(())
 }

@@ -397,7 +397,7 @@ fn max_viewport_resolution(ctx: &egui::Context) -> u32 {
     let screen_size_in_pixels = egui::Vec2::new(4000.0, 4000.0).min(screen_rect.size() * pixels_per_point);
 
     let max_viewport_resolution = (screen_size_in_pixels.x * screen_size_in_pixels.y) as u32;
-    println!("Max resolution: {max_viewport_resolution}");
+    tracing::info!("Max resolution: {max_viewport_resolution}");
     max_viewport_resolution
 }
 
