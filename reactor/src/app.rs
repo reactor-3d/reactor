@@ -138,7 +138,7 @@ enum FileDialogMode {
     Save,
 }
 
-pub struct Reactor3dApp {
+pub struct ReactorApp {
     ctx: AppContext,
     render_state: RenderState,
     tabs_tree: DockState<Tab>,
@@ -147,7 +147,7 @@ pub struct Reactor3dApp {
     active_project_dir: Option<PathBuf>,
 }
 
-impl Reactor3dApp {
+impl ReactorApp {
     pub fn new(cx: &CreationContext) -> Self {
         egui_extras::install_image_loaders(&cx.egui_ctx);
 
@@ -277,7 +277,7 @@ impl Reactor3dApp {
     }
 }
 
-impl App for Reactor3dApp {
+impl App for ReactorApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.file_dialog.update(ctx);
 

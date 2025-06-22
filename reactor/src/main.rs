@@ -3,7 +3,7 @@ use std::sync::Arc;
 use eframe::egui_wgpu::{WgpuConfiguration, WgpuSetup, WgpuSetupCreateNew};
 use eframe::wgpu;
 
-use self::app::Reactor3dApp;
+use self::app::ReactorApp;
 
 mod app;
 mod node;
@@ -49,6 +49,6 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "reactor",
         native_options,
-        Box::new(|cx| Ok(Box::new(Reactor3dApp::new(cx)))),
+        Box::new(|cx| Ok(Box::new(ReactorApp::new(cx)))),
     )
 }
